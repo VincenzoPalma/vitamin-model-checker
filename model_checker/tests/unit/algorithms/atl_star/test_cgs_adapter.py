@@ -7,6 +7,7 @@ from model_checker.algorithms.explicit.ATL_STAR.cgs_adapter import (
     adapt,
 )
 from model_checker.tests.unit.algorithms.atl_star.toy_cgs import (
+    AllWildcardToyCGS,
     BadInitialStateToyCGS,
     CompactActionCGS,
     MalformedToyCGS,
@@ -19,6 +20,11 @@ def test_states_and_initial_state():
     result = adapt(ToyCGS())
     assert result.transition_system.states == {"s0", "s1"}
     assert result.transition_system.initial_states == {"s0"}
+
+
+def test_propositions_are_the_models_declared_atomic_propositions():
+    result = adapt(ToyCGS())
+    assert result.propositions == frozenset({"granted"})
 
 
 def test_players_are_one_based():
@@ -76,6 +82,16 @@ def test_wildcard_cell_self_loops_on_every_action_not_already_used_from_that_sta
     for agent1, agent2 in [("req", "deny"), ("idle", "grant"), ("idle", "deny")]:
         action = frozenset({(1, agent1), (2, agent2)})
         assert ts.successors("s0", action) == {"s0"}
+
+
+def test_all_wildcard_cgs_self_loops_instead_of_deadlocking():
+    # known_actions is empty here (no cell in the whole model is anything
+    # but "*"), so without the fallback the state would get zero
+    # self-loops at all, a silent total deadlock.
+    result = adapt(AllWildcardToyCGS())
+    ts = result.transition_system
+    wildcard_action = frozenset({(1, "*")})
+    assert ts.successors("s0", wildcard_action) == {"s0"}
 
 
 def test_joint_action_supports_the_compact_one_character_per_agent_form():

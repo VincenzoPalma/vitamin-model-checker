@@ -2,19 +2,20 @@
 Requires Spot, see environment.yml / tests/test_automaton.py. Skipped
 entirely if spot isn't importable."""
 
-from dataclasses import replace
-
 # ruff: noqa: E402  -- imports deliberately follow importorskip("spot") below, to skip this whole file cleanly if Spot isn't installed
 import pytest
 
 spot = pytest.importorskip("spot")
 
-from model_checker.automata.acceptance import AcceptanceKind
+from model_checker.automata.acceptance import AcceptanceCondition, AcceptanceKind, ParityKind, ParityStyle
 from model_checker.automata.automaton import Automaton
 from model_checker.automata.games.arena import concurrent_to_turnbased
+from model_checker.automata.games.game import Game
 from model_checker.automata.games.solver import solve
 from model_checker.automata.product import complete, product
 from model_checker.automata.transition_system import TransitionSystem
+
+_parity_max_odd = AcceptanceCondition(kind=AcceptanceKind.PARITY, parity_kind=ParityKind.MAX, parity_style=ParityStyle.ODD)
 
 
 def _toy_system():
@@ -46,6 +47,22 @@ def test_product_pairs_states_and_only_keeps_compatible_transitions():
     ]
     assert len(fixed_points) == 1
     assert result.successors(fixed_points[0], frozenset({"a", "b"})) == {fixed_points[0]}
+
+
+def test_product_treats_a_bare_string_symbol_as_a_single_ap_by_default():
+    # Regression test: valuation_bdd() used to do set(label(source, symbol)),
+    # and Python iterates a bare str character-by-character, so a
+    # multi-character symbol like "grant" would be silently seen as
+    # {"g", "r", "a", "n", "t"} instead of the single AP "grant".
+    automaton = Automaton(graph=spot.translate("grant", "parity", "deterministic"))
+    ts = TransitionSystem()
+    ts.add_transition("s0", "grant", "s1")
+    ts.add_state("s0", initial=True)
+
+    result, _ = product(automaton, ts)
+
+    aut_init = automaton.graph.get_init_state_number()
+    assert result.successors(("s0", aut_init), "grant") != set()
 
 
 def test_product_returns_automaton_acceptance_as_objective():
@@ -116,7 +133,8 @@ def test_complete_redirects_a_missing_transition_to_a_rejecting_sink():
     underlying.add_transition("s0", frozenset(), "s0")
     underlying.add_transition("s0", frozenset({"a"}), "s0")  # a real action product() dropped
 
-    completed, priorities = complete(product_ts, {}, underlying)
+    completed, completed_objective = complete(product_ts, _parity_max_odd, underlying)
+    priorities = completed_objective.priorities
 
     missing = [
         target
@@ -142,11 +160,11 @@ def test_complete_is_a_noop_when_nothing_is_missing():
     underlying = TransitionSystem()
     underlying.add_transition("s0", frozenset(), "s0")  # exactly what product_ts already has
 
-    completed, priorities = complete(product_ts, {}, underlying)
+    completed, completed_objective = complete(product_ts, _parity_max_odd, underlying)
 
     assert completed.states == product_ts.states
     assert completed.transitions == product_ts.transitions
-    assert priorities == {}
+    assert completed_objective.priorities == {}
 
 
 def test_complete_leaves_its_inputs_untouched():
@@ -159,7 +177,7 @@ def test_complete_leaves_its_inputs_untouched():
     original_states = set(product_ts.states)
     original_transitions = {k: set(v) for k, v in product_ts.transitions.items()}
 
-    complete(product_ts, {}, underlying)
+    complete(product_ts, _parity_max_odd, underlying)
 
     assert product_ts.states == original_states
     assert product_ts.transitions == original_transitions
@@ -177,14 +195,75 @@ def test_complete_makes_a_next_shaped_automaton_solvable_instead_of_deadlocking(
     ts.add_state("s0", initial=True)
 
     product_ts, objective = product(automaton, ts)
-    completed, priorities = complete(product_ts, objective.priorities, ts)
+    completed, completed_objective = complete(product_ts, objective, ts)
 
     game = concurrent_to_turnbased(
         _as_single_agent_symbols(completed), controlled_players={"p"}
     )
-    game.objective = replace(objective, priorities=priorities)
+    game.objective = completed_objective
     # must not raise despite the underlying automaton being incomplete
     solve(game)
+
+
+def test_complete_sink_rejects_under_a_buchi_game_end_to_end():
+    # Regression test: a hardcoded sink priority of 0 would make the sink
+    # *accept* under Büchi (0 is Büchi's own accepting mark, Inf(0)) instead
+    # of reject. Checked directly on the sink's own winning-region
+    # membership, not through a state that could just avoid it, since that
+    # wouldn't tell apart "the sink rejects" from "there's a way around it".
+    product_ts = TransitionSystem()
+    product_ts.add_transition(("s0", 0), "a", ("s0", 0))
+    product_ts.add_state(("s0", 0), initial=True)
+    underlying = TransitionSystem()
+    underlying.add_transition("s0", "a", "s0")
+    underlying.add_transition("s0", "b", "s0")  # "b" missing from product_ts -> genuine gap
+
+    objective = AcceptanceCondition(kind=AcceptanceKind.BUCHI, priorities={(("s0", 0), "a", ("s0", 0)): 0})
+    completed, completed_objective = complete(product_ts, objective, underlying)
+
+    game = Game(arena=completed, player_states={0: set(completed.states), 1: set()}, objective=completed_objective)
+    solution = solve(game)
+
+    sink = next(state for state in completed.states if state != ("s0", 0))
+    assert sink in solution.winning_regions[1]
+    assert ("s0", 0) in solution.winning_regions[0]
+
+
+def test_complete_sink_rejects_under_a_max_even_parity_objective():
+    # Regression test: a hardcoded priority 0 would win under an EVEN style
+    # (0 is even), even though the sink must always reject -- an odd color
+    # (1) is needed instead.
+    product_ts = TransitionSystem()
+    product_ts.add_transition(("s0", 0), frozenset(), ("s0", 0))
+    product_ts.add_state(("s0", 0), initial=True)
+    underlying = TransitionSystem()
+    underlying.add_transition("s0", frozenset(), "s0")
+    underlying.add_transition("s0", frozenset({"a"}), "s0")
+
+    objective = AcceptanceCondition(kind=AcceptanceKind.PARITY, parity_kind=ParityKind.MAX, parity_style=ParityStyle.EVEN)
+    completed, completed_objective = complete(product_ts, objective, underlying)
+
+    missing = [
+        target
+        for target in completed.successors(("s0", 0), frozenset({"a"}))
+        if target != ("s0", 0)
+    ]
+    (sink,) = missing
+    assert completed_objective.priorities[(sink, frozenset({"a"}), sink)] == 1
+    assert completed_objective.priorities[(sink, frozenset(), sink)] == 1
+
+
+def test_complete_requires_parity_style_for_a_parity_objective():
+    product_ts = TransitionSystem()
+    product_ts.add_transition(("s0", 0), frozenset(), ("s0", 0))
+    product_ts.add_state(("s0", 0), initial=True)
+    underlying = TransitionSystem()
+    underlying.add_transition("s0", frozenset(), "s0")
+    underlying.add_transition("s0", frozenset({"a"}), "s0")
+
+    objective = AcceptanceCondition(kind=AcceptanceKind.PARITY)  # parity_style left unset
+    with pytest.raises(ValueError, match="parity_style"):
+        complete(product_ts, objective, underlying)
 
 
 def _as_single_agent_symbols(ts: TransitionSystem) -> TransitionSystem:

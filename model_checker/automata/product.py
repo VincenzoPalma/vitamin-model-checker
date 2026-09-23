@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Hashable, Iterable
+from dataclasses import replace
 
-from .acceptance import AcceptanceCondition, priority_from_mark
+from .acceptance import AcceptanceCondition, AcceptanceKind, ParityStyle, priority_from_mark
 from .automaton import Automaton, spot
 from .transition_system import TransitionSystem
 
@@ -29,8 +30,10 @@ def product(
     works even on joint-action-labeled systems.
 
     Args:
-        label: transition -> AP-set the automaton should see; defaults to
-            the symbol itself.
+        label: transition -> AP-set the automaton should see, either an
+            iterable of AP names or a single AP name as a bare `str`
+            (treated as one AP, not iterated character-by-character);
+            defaults to the symbol itself.
 
     Returns:
         The product `TransitionSystem` and its `AcceptanceCondition`
@@ -62,7 +65,8 @@ def product(
         cached = valuation_cache.get(key)
         if cached is not None:
             return cached
-        true_aps = set(label(source, symbol))
+        raw_label = label(source, symbol)
+        true_aps = {raw_label} if isinstance(raw_label, str) else set(raw_label)
         literals = " & ".join(ap if ap in true_aps else f"!{ap}" for ap in aps)
         formula = spot_mod.formula(literals) if literals else spot_mod.formula("1")
         result = spot_mod.formula_to_bdd(formula, bdict, graph)
@@ -113,29 +117,40 @@ def product(
 
 def complete(
     product_ts: TransitionSystem,
-    priorities: dict[tuple[Hashable, Hashable, Hashable], int],
+    objective: AcceptanceCondition,
     transition_system: TransitionSystem,
-    sink_priority: int = 0,
-) -> tuple[TransitionSystem, dict[tuple[Hashable, Hashable, Hashable], int]]:
+) -> tuple[TransitionSystem, AcceptanceCondition]:
     """Make `product()`'s output deadlock-free for `games/solver.py`'s `solve()`.
 
     A deterministic automaton's transition function can be partial (e.g. a
     `Next`-shaped subformula), so `product()` can omit edges, leaving a product
     state with no move for a real action. Redirects each such missing
-    `(product_state, symbol)` to a shared rejecting sink, self-looping with
-    `sink_priority` on every real action.
+    `(product_state, symbol)` to a shared rejecting sink, self-looping on
+    every real action.
+
+    The sink's self-loop color is derived from `objective`, not hardcoded,
+    since the same color can mean opposite things depending on acceptance
+    kind: for Büchi (accept iff a marked transition recurs infinitely,
+    `Inf(0)`), the sink is left unmarked, since an unmarked edge can never
+    satisfy that; for co-Büchi (accept iff `Fin(0)`, only finitely often),
+    marked 0, so recurring on it forever violates `Fin(0)`; for parity, a
+    sink that only ever recurs on one color is trivially both the min and
+    max recurring color forever, so only `objective.parity_style` decides
+    the losing parity — 0 under an odd style, 1 under an even one,
+    regardless of `objective.parity_kind`.
 
     Args:
         product_ts: `product()`'s first return value.
-        priorities: `product()`'s second return value's `.priorities`.
+        objective: `product()`'s second return value.
         transition_system: same system passed to `product()`, for looking up
             each state's real actions.
-        sink_priority: color for the sink's self-loop; even (the default)
-            always loses under `Automaton.from_ltl`'s max-odd automata — use
-            odd for a min/even-oriented objective.
 
     Returns:
-        A new `(transition_system, priorities)` pair; inputs left untouched.
+        A new `(transition_system, objective)` pair; inputs left untouched.
+
+    Raises:
+        ValueError: `objective.kind` is `PARITY` but `objective.parity_style`
+            is unset.
     """
     real_symbols_by_state: dict[Hashable, set[Hashable]] = {}
     for source, symbol in transition_system.transitions:
@@ -147,7 +162,7 @@ def complete(
         alphabet=set(product_ts.alphabet),
         transitions={key: set(targets) for key, targets in product_ts.transitions.items()},
     )
-    completed_priorities = dict(priorities)
+    completed_priorities = dict(objective.priorities)
 
     sink = object()
     missing = False
@@ -159,8 +174,25 @@ def complete(
                 missing = True
 
     if missing:
+        sink_priority = _rejecting_sink_priority(objective)
         for symbol in completed.alphabet:
             completed.add_transition(sink, symbol, sink)
-            completed_priorities[(sink, symbol, sink)] = sink_priority
+            if sink_priority is not None:
+                completed_priorities[(sink, symbol, sink)] = sink_priority
 
-    return completed, completed_priorities
+    return completed, replace(objective, priorities=completed_priorities)
+
+
+def _rejecting_sink_priority(objective: AcceptanceCondition) -> int | None:
+    """The color to mark a forever-self-looping sink with so it always
+    rejects under `objective`, or `None` to leave it unmarked. See
+    `complete()`'s docstring for the reasoning per acceptance kind."""
+    if objective.kind is AcceptanceKind.BUCHI:
+        return None
+    if objective.kind is AcceptanceKind.CO_BUCHI:
+        return 0
+    if objective.kind is AcceptanceKind.PARITY:
+        if objective.parity_style is None:
+            raise ValueError("a PARITY objective needs parity_style set to pick a rejecting sink color")
+        return 0 if objective.parity_style is ParityStyle.ODD else 1
+    raise ValueError(f"unsupported acceptance kind {objective.kind!r}")

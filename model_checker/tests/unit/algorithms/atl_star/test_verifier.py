@@ -46,6 +46,16 @@ def test_bare_temporal_operator_at_top_level_raises(model):
         sat(Next(Prop("granted")), model)
 
 
+def test_unknown_proposition_at_top_level_raises(model):
+    with pytest.raises(ValueError, match="missing"):
+        sat(Prop("missing"), model)
+
+
+def test_unknown_proposition_nested_in_a_coalitions_path_formula_raises(model):
+    with pytest.raises(ValueError, match="missing"):
+        sat(Coalition(frozenset({1}), Prop("missing")), model)
+
+
 def test_grand_coalition_can_force_eventually_granted(model):
     formula = Coalition(frozenset({1, 2}), Until(True_(), Prop("granted")))
     assert sat(formula, model) == {"s0", "s1"}

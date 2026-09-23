@@ -62,6 +62,37 @@ class ToyCGS:
         return str(action_string).split(",")
 
 
+class AllWildcardToyCGS:
+    """Every cell is a wildcard, no concrete action anywhere in the model —
+    the shape of VITAMIN's own timedCGS/tctl_tol_minimal.txt fixture, where
+    known_actions would otherwise stay empty and the state gets zero
+    self-loops instead of "absorbing under any action"."""
+
+    def __init__(self) -> None:
+        self.states = ["s0"]
+        self.initial_state = "s0"
+        self.atomic_propositions = ["p"]
+        self.matrix_prop = [[1]]
+        self.graph = [["*"]]
+
+    def get_number_of_agents(self) -> int:
+        return 1
+
+    def get_state_name_by_index(self, index: int) -> str:
+        return self.states[index]
+
+    def get_index_by_state_name(self, state: object) -> int:
+        return self.states.index(state)
+
+    def get_edges(self) -> list[tuple[str, str]]:
+        return _get_edges(self.graph, self.states)
+
+    def build_action_list(self, action_string: object) -> list[str]:
+        if action_string == "*":
+            action_string = "*" * self.get_number_of_agents()
+        return str(action_string).split(",")
+
+
 class MalformedToyCGS(ToyCGS):
     """Same shape, but `s0`'s self-loop cell has a single-character profile,
     too short for 2 agents under either format (compact-per-character or

@@ -142,9 +142,15 @@ def sat(formula: Formula, model: AdaptedCGS) -> set[str]:
 
     Raises:
         ValueError: `formula` isn't a state formula (a bare `Next`/`Until`
-            outside a `Coalition`'s path formula).
+            outside a `Coalition`'s path formula), or references a
+            proposition name that isn't among `model`'s declared ones.
     """
     if isinstance(formula, Prop):
+        if formula.name not in model.propositions:
+            raise ValueError(
+                f"{formula.name!r} is not among the model's declared "
+                f"propositions {sorted(model.propositions)}"
+            )
         return {state for state, props in model.labels.items() if formula.name in props}
     if isinstance(formula, True_):
         return set(model.transition_system.states)
@@ -161,7 +167,8 @@ def holds(formula: Formula, model: AdaptedCGS, state: str | None = None) -> bool
     """Whether `formula` holds at `state` (default: `model`'s own initial state).
 
     Raises:
-        ValueError: `state` isn't a state of `model`.
+        ValueError: `state` isn't a state of `model`, or `formula` references
+            a proposition name that isn't among `model`'s declared ones.
     """
     state = _resolve_state(model, state)
     return state in sat(formula, model)
@@ -177,7 +184,8 @@ def check(cgs: CGSProtocol, formula_text: str, state: str | None = None) -> bool
     Raises:
         ATLStarParseError: `formula_text` is malformed, or a coalition names
             an agent id outside `cgs`'s own agents.
-        ValueError: the parsed formula isn't a state formula.
+        ValueError: the parsed formula isn't a state formula, or references
+            a proposition name that isn't among `cgs`'s declared ones.
     """
     model = adapt(cgs)
     formula = parse(formula_text, num_agents=len(model.players))
@@ -237,10 +245,10 @@ def _solve_coalition(formula: Coalition, model: AdaptedCGS) -> _CoalitionSolutio
     probe = replace(model.transition_system, initial_states=set(model.transition_system.states))
     product_ts, objective = product(automaton, probe, label=lambda source, symbol: labels[source])
     real_states = set(product_ts.states)
-    product_ts, priorities = complete(product_ts, objective.priorities, probe)
+    product_ts, objective = complete(product_ts, objective, probe)
 
     game = concurrent_to_turnbased(product_ts, controlled_players=agents)
-    game.objective = replace(objective, priorities=remap_priorities(priorities, agents))
+    game.objective = replace(objective, priorities=remap_priorities(objective.priorities, agents))
 
     solution = solve(game)
     aut_init = automaton.graph.get_init_state_number()
@@ -268,7 +276,14 @@ def _eliminate(
     place), keyed by the fresh proposition's name then by CGS state, solving
     it already computes one (every solver returns a region and a strategy
     together), so keeping it costs nothing extra."""
-    if isinstance(psi, (Prop, True_)):
+    if isinstance(psi, Prop):
+        if psi.name not in model.propositions:
+            raise ValueError(
+                f"{psi.name!r} is not among the model's declared "
+                f"propositions {sorted(model.propositions)}"
+            )
+        return psi, labels
+    if isinstance(psi, True_):
         return psi, labels
     if isinstance(psi, Not):
         operand, labels = _eliminate(psi.operand, model, labels, counter, nested)

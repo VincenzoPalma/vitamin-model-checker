@@ -223,13 +223,33 @@ def test_solve_gives_correct_verdict_for_every_initial_state_not_just_one():
     assert solution.winning_regions[1] == {"t0"}
 
 
-def test_solve_requires_at_least_one_initial_state():
+def test_solve_requires_at_least_one_state():
+    ts = TransitionSystem()
+    game = Game(arena=ts, player_states={0: set(), 1: set()}, objective=_buchi_objective())
+
+    with pytest.raises(ValueError, match="at least one state"):
+        solve(game)
+
+
+def test_solve_gives_correct_verdict_even_for_a_state_never_marked_initial():
+    # Regression test: the reachability anchor used to bridge only to
+    # game.arena.initial_states, so a winning state that was simply never
+    # declared initial (e.g. a state product()'s BFS reaches but never
+    # seeds from) could be silently misreported as a loss, since Spot
+    # defaults winners to false for anything unreachable from its own init.
     ts = TransitionSystem()
     ts.add_transition("s0", "a", "s0")
-    game = Game(arena=ts, player_states={0: {"s0"}, 1: set()}, objective=_buchi_objective())
+    ts.add_transition("t0", "a", "t0")  # t0 is never marked initial=True
+    ts.add_state("s0", initial=True)
+    game = Game(
+        arena=ts,
+        player_states={0: {"s0", "t0"}, 1: set()},
+        objective=_buchi_objective(("s0", "a", "s0"), ("t0", "a", "t0")),
+    )
 
-    with pytest.raises(ValueError, match="initial state"):
-        solve(game)
+    solution = solve(game)
+
+    assert solution.winning_regions[0] == {"s0", "t0"}
 
 
 def test_solve_requires_every_state_owned_by_exactly_one_player():
@@ -239,6 +259,20 @@ def test_solve_requires_every_state_owned_by_exactly_one_player():
     game = Game(arena=ts, player_states={0: set(), 1: set()}, objective=_buchi_objective())
 
     with pytest.raises(ValueError, match="exactly one"):
+        solve(game)
+
+
+def test_solve_rejects_a_nondeterministic_arena():
+    # Strategy only records the chosen action, not which successor it led
+    # to, so an ambiguous (state, action) -> {multiple targets} can't be
+    # soundly turned into a Strategy the caller could actually replay.
+    ts = TransitionSystem()
+    ts.add_transition("s0", "a", "s1")
+    ts.add_transition("s0", "a", "s2")
+    ts.add_state("s0", initial=True)
+    game = Game(arena=ts, player_states={0: {"s0", "s1", "s2"}, 1: set()}, objective=_buchi_objective())
+
+    with pytest.raises(ValueError, match="deterministic"):
         solve(game)
 
 

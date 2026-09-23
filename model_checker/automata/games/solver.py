@@ -28,16 +28,19 @@ def solve(game: Game) -> GameSolution:
     from the one state it's told is initial (confirmed empirically,
     undocumented); everything else silently defaults to a loss, even though
     winning regions are otherwise a whole-graph fixed point. So every state
-    in `game.arena.initial_states` (there can be more than one) gets bridged
-    from a throwaway state via an unmarked edge and solving anchors there
-    instead, invisible in the returned `GameSolution`, and harmless to any
-    acceptance condition, since an unmarked one-off prefix can't affect what
-    recurs infinitely often.
+    in `game.arena.states` — not just the ones marked initial, since a
+    winning state that's simply never declared initial would otherwise be
+    silently misreported as a loss — gets bridged from a throwaway state via
+    an unmarked edge and solving anchors there instead, invisible in the
+    returned `GameSolution`, and harmless to any acceptance condition, since
+    an unmarked one-off prefix can't affect what recurs infinitely often.
 
     Raises:
         ImportError: if Spot isn't importable.
-        ValueError: if `objective` is unset, the arena has no initial state
-            at all, or `player_states` isn't a proper partition.
+        ValueError: if `objective` is unset, the arena has no state at all,
+            `player_states` isn't a proper partition, or the arena is
+            nondeterministic (some `(state, action)` has more than one
+            successor).
     """
     if spot is None:
         raise ImportError("Spot is required for solve() "
@@ -45,8 +48,8 @@ def solve(game: Game) -> GameSolution:
                            "see docs/ATL_STAR/algorithm.md)")
     if game.objective is None:
         raise ValueError("Game.objective must be set before solving (arena.py leaves it None on purpose)")
-    if not game.arena.initial_states:
-        raise ValueError("game.arena must have at least one initial state")
+    if not game.arena.states:
+        raise ValueError("game.arena must have at least one state")
 
     states = list(game.arena.states)
     state_index = {state: i for i, state in enumerate(states)}
@@ -55,6 +58,21 @@ def solve(game: Game) -> GameSolution:
     owner1 = game.player_states.get(1, set())
     if not owner0.isdisjoint(owner1) or (owner0 | owner1) != game.arena.states:
         raise ValueError("every arena state must belong to exactly one of player_states[0]/[1]")
+
+    # A `Strategy` records only the chosen action, not which successor it
+    # led to (see strategy.py), so an arena where one action from a state
+    # has more than one possible target would let Spot "win" via a specific
+    # edge that the returned Strategy can't actually tell apart from a
+    # losing one sharing the same action. Rejected outright rather than
+    # solved unsoundly: this game model is 2-player, total-information,
+    # with no third "nature" player to own leftover nondeterminism.
+    for (source, symbol), targets in game.arena.transitions.items():
+        if len(targets) > 1:
+            raise ValueError(
+                f"solve() requires a deterministic arena: state {source!r} has "
+                f"{len(targets)} successors for action {symbol!r} ({sorted(map(str, targets))}); "
+                "every (state, action) pair must lead to exactly one successor"
+            )
 
     aut = spot.make_twa_graph(spot.make_bdd_dict())
     aut.new_states(len(states) + 1)  # +1 for the throwaway reachability-anchor state, placed last
@@ -73,8 +91,8 @@ def solve(game: Game) -> GameSolution:
             edge_number = aut.new_edge(state_index[source], state_index[target], true_cond, mark)
             edge_labels[edge_number] = key
 
-    for initial in game.arena.initial_states:
-        aut.new_edge(anchor, state_index[initial], true_cond, [])
+    for state in game.arena.states:
+        aut.new_edge(anchor, state_index[state], true_cond, [])
 
     # placing the anchor last means these zips naturally drop its own
     # winner/strategy entry, it was never a real arena state

@@ -11,7 +11,9 @@ action" (per `cgs_utils.get_edges`/`graph_relations.labeled_pairs`,
 regardless of which column it's in). Materialized as an explicit
 self-loop for every action already used elsewhere in the CGS, added after
 the whole graph is built, and skipped for any action the source already
-has a real destination for.
+has a real destination for. If the whole CGS never defines a single real
+action (every cell is a wildcard), falls back to one synthetic all-"*"
+joint action instead of leaving the state with no transitions at all.
 
 Reads `cgs.graph` via `get_edges()` instead of a raw O(states^2) scan of
 the dense state x state matrix (cached on a real VITAMIN `CGS` until
@@ -50,6 +52,7 @@ class AdaptedCGS:
     transition_system: TransitionSystem
     labels: dict[Hashable, frozenset[str]]
     players: tuple[int, ...]
+    propositions: frozenset[str]
 
 
 def adapt(cgs: CGSProtocol) -> AdaptedCGS:
@@ -103,15 +106,21 @@ def adapt(cgs: CGSProtocol) -> AdaptedCGS:
                 continue
             _record(state_names[source_index], state_names[target_index], mask)
 
+    wildcard_action = frozenset((agent, WILDCARD) for agent in range(1, num_agents + 1))
     for source in wildcard_sources:
         already_explicit = explicit_actions_by_source.get(source, set())
-        for action in known_actions - already_explicit:
+        for action in (known_actions or {wildcard_action}) - already_explicit:
             ts.add_transition(source, action, source)
 
     props = list(cgs.atomic_propositions)
     labels = {state: _labels_of(props, cgs.matrix_prop[index]) for index, state in enumerate(state_names)}
 
-    return AdaptedCGS(transition_system=ts, labels=labels, players=players)
+    return AdaptedCGS(
+        transition_system=ts,
+        labels=labels,
+        players=players,
+        propositions=frozenset(str(p) for p in props),
+    )
 
 
 def _joint_action(profile: str, num_agents: int) -> JointAction:
