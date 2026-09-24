@@ -9,7 +9,6 @@ looping on target forever is exactly "reachability of target" restated as
 an infinitary condition.
 """
 
-# ruff: noqa: E402  -- imports deliberately follow importorskip("spot") below, to skip this whole file cleanly if Spot isn't installed
 import pytest
 
 spot = pytest.importorskip("spot")

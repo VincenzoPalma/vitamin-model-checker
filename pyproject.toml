@@ -58,7 +58,7 @@ dev = [
     "pytest-xdist>=3.6.0",
 ]
 atl_star = [
-    "spottl; sys_platform == 'linux'",
+    "spottl>=2.13; sys_platform == 'linux'",
 ]
 docs = [
     "mkdocs>=1.5.0",
@@ -180,6 +180,7 @@ markers = [
     "natatl: NatATL algorithm tests",
     "oatl: OATL algorithm tests",
     "capatl: CapATL algorithm tests",
+    "atl_star: ATL* algorithm tests",
     "shared: Shared utility tests",
     "complex: Complex formula tests"
 ]
@@ -284,3 +285,4 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py
+"model_checker/tests/**/*.py" = ["E402"]  # imports after importorskip("spot")

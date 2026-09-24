@@ -2,20 +2,21 @@
 classical ATL cannot express, plus a real ATL fixture reused unchanged
 (ATL* runs over plain CGS, no new game-structure type is needed)."""
 
-# ruff: noqa: E402  -- imports deliberately follow importorskip("spot") below,
-# to skip this whole file cleanly if Spot isn't installed
 import pytest
 
 spot = pytest.importorskip("spot")
 
 from model_checker.algorithms.explicit.ATL_STAR.ATL_STAR import (
     _core_atl_star_checking,
+    model_checking,
 )
 from model_checker.tests.helpers.model_helpers import (
     build_cgs_model_content,
     extract_states_from_result,
     load_cgs_from_content,
 )
+
+pytestmark = pytest.mark.atl_star
 
 
 @pytest.mark.semantic
@@ -126,3 +127,54 @@ class TestATLStarErrorHandling:
         result = _core_atl_star_checking(cgs_simple_parser, "<<5>> F p")
         assert "error" in result
         assert result["error"]["type"] == "syntax"
+
+    def test_nonexistent_atomic_proposition(self, cgs_simple_parser):
+        """Mirrors ATL's own test_atl_nonexistent_atomic_proposition: an
+        undeclared atom must come back as a clean "semantic" error, not
+        propagate as a raw exception nor fall into the generic "system"
+        bucket."""
+        result = _core_atl_star_checking(cgs_simple_parser, "<<1>> F nonexistent")
+        assert "error" in result
+        assert result["error"]["type"] == "semantic"
+
+    def test_bare_next_at_top_level(self, cgs_simple_parser):
+        """`X p` with no `<<...>>` around it parses fine (X/U are valid
+        *path* formulas syntactically), but isn't a state formula: must
+        come back as "semantic", not propagate as a raw exception."""
+        result = _core_atl_star_checking(cgs_simple_parser, "X p")
+        assert "error" in result
+        assert result["error"]["type"] == "semantic"
+
+    def test_bare_until_at_top_level(self, cgs_simple_parser):
+        """Same as above for a bare `p U q`."""
+        result = _core_atl_star_checking(cgs_simple_parser, "p U q")
+        assert "error" in result
+        assert result["error"]["type"] == "semantic"
+
+
+@pytest.mark.integration
+@pytest.mark.model_checking
+class TestATLStarRealEntryPoint:
+    """Exercises the real, registered `model_checking(formula, filename)`
+    entry point end to end (file loading + `execute_model_checking_with_parser`'s
+    own wrapper included), not just `_core_atl_star_checking` in isolation,
+    mirroring how ATL's own test_correctness.py calls `model_checking` directly."""
+
+    def test_valid_formula_through_the_real_entry_point(self, cgs_simple_parser):
+        result = model_checking("<<1,2>> F (p & q)", cgs_simple_parser.filename)
+        assert "error" not in result
+        assert "res" in result and "initial_state" in result
+
+    def test_bare_next_through_the_real_entry_point(self, cgs_simple_parser):
+        """The full wrapper stack (`execute_model_checking_with_parser`) has
+        its own generic `except Exception -> "system"` fallback; a bare
+        path formula must still come back "semantic" from the inner catch,
+        not fall through to that generic bucket."""
+        result = model_checking("X p", cgs_simple_parser.filename)
+        assert "error" in result
+        assert result["error"]["type"] == "semantic"
+
+    def test_bare_until_through_the_real_entry_point(self, cgs_simple_parser):
+        result = model_checking("p U q", cgs_simple_parser.filename)
+        assert "error" in result
+        assert result["error"]["type"] == "semantic"

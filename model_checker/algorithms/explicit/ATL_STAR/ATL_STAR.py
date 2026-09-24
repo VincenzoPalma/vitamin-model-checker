@@ -40,6 +40,8 @@ def _core_atl_star_checking(cgs: "CGS", formula: str) -> dict[str, Any]:
         satisfying_states = verifier.sat(parsed_formula, model)
     except ImportError as e:
         return create_error_response("environment", str(e))
+    except ValueError as e:
+        return create_error_response("semantic", str(e))
 
     initial_state = cgs.initial_state
     is_satisfied = verify_initial_state(initial_state, satisfying_states)

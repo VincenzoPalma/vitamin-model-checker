@@ -5,7 +5,6 @@ docs/ATL_STAR/algorithm.md) — Spot has no win-64 build either way, so run
 from WSL on Windows. Skipped entirely if spot isn't importable.
 """
 
-# ruff: noqa: E402  -- imports deliberately follow importorskip("spot") below, to skip this whole file cleanly if Spot isn't installed
 import pytest
 
 spot = pytest.importorskip("spot")

@@ -15,6 +15,8 @@ from model_checker.tests.unit.algorithms.atl_star.toy_cgs import (
     WildcardToyCGS,
 )
 
+pytestmark = pytest.mark.atl_star
+
 
 def test_states_and_initial_state():
     result = adapt(ToyCGS())

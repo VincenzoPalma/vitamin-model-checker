@@ -160,7 +160,10 @@ def sat(formula: Formula, model: AdaptedCGS) -> set[str]:
         return sat(formula.left, model) & sat(formula.right, model)
     if isinstance(formula, Coalition):
         return _sat_coalition(formula, model)
-    raise ValueError(f"{formula!r} is not a state formula")
+    raise ValueError(
+        f"a bare {type(formula).__name__} is not a state formula; "
+        "temporal operators need a <<...>> coalition around them"
+    )
 
 
 def holds(formula: Formula, model: AdaptedCGS, state: str | None = None) -> bool:

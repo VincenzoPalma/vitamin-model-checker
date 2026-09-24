@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-# ruff: noqa: E402  -- imports deliberately follow importorskip("spot") below,
-# to skip this whole file cleanly if Spot isn't installed
 import pytest
 
 spot = pytest.importorskip("spot")
@@ -18,6 +16,8 @@ from model_checker.parsers.formulas.ATL_STAR.formula import (
     Until,
 )
 from model_checker.tests.unit.algorithms.atl_star.toy_cgs import ToyCGS
+
+pytestmark = pytest.mark.atl_star
 
 
 @pytest.fixture

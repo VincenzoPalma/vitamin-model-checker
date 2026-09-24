@@ -10,7 +10,6 @@ importable.
 
 from dataclasses import replace
 
-# ruff: noqa: E402  -- imports deliberately follow importorskip("spot") below, to skip this whole file cleanly if Spot isn't installed
 import pytest
 
 spot = pytest.importorskip("spot")

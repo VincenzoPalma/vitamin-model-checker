@@ -13,6 +13,8 @@ from model_checker.parsers.formulas.ATL_STAR.formula import (
 )
 from model_checker.parsers.formulas.ATL_STAR.grammar import ATLStarParseError, parse
 
+pytestmark = pytest.mark.atl_star
+
 
 def test_atom():
     assert parse("p") == Prop("p")
@@ -34,6 +36,11 @@ def test_conjunction_left_associative():
 
 def test_and_binds_tighter_than_or():
     assert parse("p & q | r") == Not(And(Not(And(Prop("p"), Prop("q"))), Not(Prop("r"))))
+
+
+def test_double_symbol_and_or_are_synonyms_for_the_single_symbol_forms():
+    assert parse("p && q") == parse("p & q")
+    assert parse("p || q") == parse("p | q")
 
 
 def test_lowercase_single_letter_stays_a_prop():

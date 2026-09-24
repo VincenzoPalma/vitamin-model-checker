@@ -18,9 +18,9 @@ Grammar (lowest to highest precedence; parentheses always disambiguate):
     atom        := PROP | 'true' | 'false' | '(' formula ')'
     agents      := INT (',' INT)*
 
-Each keyword also accepts its word form (`not`/`!`, `and`/`&`, `or`/`|`,
-`implies`/`->`, `next`/`X`, `eventually`/`F`, `globally`/`G`, `until`/`U`),
-case-insensitive. Only uppercase `X`/`F`/`G`/`U` are reserved as
+Each keyword also accepts its word form (`not`/`!`, `and`/`&`/`&&`,
+`or`/`|`/`||`, `implies`/`->`, `next`/`X`, `eventually`/`F`, `globally`/`G`,
+`until`/`U`), case-insensitive. Only uppercase `X`/`F`/`G`/`U` are reserved as
 single-letter operators, so lowercase single-letter propositions stay free.
 
 A coalition binds like a prefix operator over the tightest following
@@ -78,8 +78,8 @@ _TOKEN_RE = re.compile(
     | (?P<RPAREN>\))
     | (?P<COMMA>,)
     | (?P<IMPLIES>->)
-    | (?P<AND>&)
-    | (?P<OR>\|)
+    | (?P<AND>&&?)
+    | (?P<OR>\|\|?)
     | (?P<NOT>!)
     | (?P<INT>\d+)
     | (?P<IDENT>[a-zA-Z_][a-zA-Z0-9_]*)

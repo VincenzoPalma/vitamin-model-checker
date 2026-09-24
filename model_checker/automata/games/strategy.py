@@ -24,8 +24,15 @@ class Strategy:
         """Project a joint-action strategy onto one player's own actions.
 
         Only valid when `choices` holds `arena.py`'s `JointAction` shape.
+
+        Raises:
+            ValueError: `player` isn't one of the agents in some state's
+                joint action.
         """
-        return Strategy({
-            state: dict(cast(Iterable[tuple[Hashable, Hashable]], action))[player]
-            for state, action in self.choices.items()
-        })
+        projected: dict[Hashable, Hashable] = {}
+        for state, action in self.choices.items():
+            per_agent = dict(cast(Iterable[tuple[Hashable, Hashable]], action))
+            if player not in per_agent:
+                raise ValueError(f"{player!r} is not one of the agents in {action!r} at state {state!r}")
+            projected[state] = per_agent[player]
+        return Strategy(projected)

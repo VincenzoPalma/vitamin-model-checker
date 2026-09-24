@@ -2,7 +2,6 @@
 Requires Spot, see environment.yml / tests/test_automaton.py. Skipped
 entirely if spot isn't importable."""
 
-# ruff: noqa: E402  -- imports deliberately follow importorskip("spot") below, to skip this whole file cleanly if Spot isn't installed
 import pytest
 
 spot = pytest.importorskip("spot")

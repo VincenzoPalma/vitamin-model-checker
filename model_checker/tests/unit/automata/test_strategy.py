@@ -3,6 +3,8 @@ Strategy is a plain dataclass wrapper (state -> action), exercised
 end-to-end via solver.py/_attractor_oracle.py elsewhere, but tested in
 isolation here."""
 
+import pytest
+
 from model_checker.automata.games.strategy import Strategy
 
 
@@ -57,6 +59,13 @@ def test_project_handles_coalitions_of_more_than_two_players():
     strategy = Strategy({"s0": _joint(A="a1", B="b1", C="c1")})
 
     assert strategy.project("C").move("s0") == "c1"
+
+
+def test_project_raises_a_clear_error_for_a_player_absent_from_the_joint_action():
+    strategy = Strategy({"s0": _joint(A="a1", B="b1")})
+
+    with pytest.raises(ValueError, match="C"):
+        strategy.project("C")
 
 
 def test_default_choices_are_not_shared_between_instances():
