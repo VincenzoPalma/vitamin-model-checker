@@ -146,7 +146,7 @@ def _name_error(name: str) -> str | None:
     if name.lower() in _RESERVED_WORDS:
         return f"{name!r} clashes with a reserved keyword"
     if not _NAME_RE.fullmatch(name):
-        return f"{name!r} is not a valid name: a name starts with a lowercase letter, then letters, digits or _"
+        return f"{name!r} is invalid: a name starts with a lowercase letter, then letters, digits or _"
     return None
 
 

@@ -945,6 +945,7 @@ only on a 1-agent model (see [NatSL](#natsl---natural-strategy-logic)).
 | ATLF | `<1,2>` | `X`, `F`, `G`, `U` | fuzzyCGS | `<1>(p U q)` |
 | IATL | `<1,2>` exists, `[1,2]` for all | `X`, `F`, `G`, `U`, `R` | BCGS | `[1,2]F goal` |
 | ATL_STAR | `<<1,2>>` | `X`, `F`, `G`, `U`, nested path formulas | CGS | `<<1>> (F p && G q)` |
+| ATL_STAR_F | `<<1,2>>` | as ATL_STAR, plus functions such as `min(...)`, `max(...)`, `avg(...)` | fuzzyCGS | `<<1>> F avg(p, q)` |
 | Wallet_ATL | `<<1>>`, `<<1:wallet(1,>=10)>>` | `X`, `F`, `G`, `U` | WalletCGS | `<<1:wallet(1,>=10)>>F p` |
 | OATL | `<1,2><10>` | `X`, `F`, `G`, `U`, `R`, `W` | costCGS | `<1,2><10> (p W q)` |
 | COTL | `<1,2><1>`, `<><0>` | `X`, `WX`, `F`, `G`, `U`, `R`, `W` | ObstructionModel | `<1,2><1> G !q` |
@@ -957,6 +958,7 @@ only on a 1-agent model (see [NatSL](#natsl---natural-strategy-logic)).
 | OL | `<J5>` | `X`, `F`, `G`, `U`, `R`, `W` | costCGS | `<J5> (p R q)` |
 | TOL | `{J5}`; clock constraint `phi : x<5`; freeze `x.phi` | `X`, `F`, `G`, `U`, `R`, `W` | timedCGS | `{J5}F x.(p : x<5)` |
 | NatSL | `E{1}x A{1}y: (x, 1)(y, 2)` | one goal: `F`, `G` or `X` | CGS | `E{1}x: (x, 1) F goal` |
+| SL1G_F | `E x A y: (x, 1)(y, 2)`, binding every agent; `<<1,2>>` | as ATL_STAR_F | fuzzyCGS | `E x A y: (x, 1)(y, 2) F p` |
 
 <a id="summary-logic-comparison-matrix"></a>
 ## Logic comparison matrix

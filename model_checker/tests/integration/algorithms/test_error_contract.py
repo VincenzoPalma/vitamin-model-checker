@@ -40,6 +40,13 @@ _CASES = {
         "<<1>> F zz",
         "<<3>> F p",
     ),
+    "ATL_STAR_F": (
+        _F + "fuzzyCGS/ATLF/atlf_2agents_4states_fuzzy.txt",
+        "<<1>> F p",
+        "<<1>> F",
+        "<<1>> F zz",
+        "<<3>> F p",
+    ),
     "CTL": (_F + "CGS/ATL/atl_2agents_4states_simple.txt", "EF p", "EF", "EF zz", None),
     "LTL": (_F + "CGS/LTL/ltl_1agent_3states_minimal.txt", "F p", "F", "F zz", None),
     "CapATL": (
@@ -91,6 +98,13 @@ _CASES = {
         "E{1}x: (x, 1) F",
         "E{1}x: (x, 1) F zz",
         None,
+    ),
+    "SL1G_F": (
+        _F + "fuzzyCGS/ATLF/atlf_2agents_4states_fuzzy.txt",
+        "E x A y: (x, 1)(y, 2) F p",
+        "E x A y: (x, 1)(y, 2) F",
+        "E x A y: (x, 1)(y, 2) F zz",
+        "E x A y: (x, 1)(y, 3) F p",
     ),
     "OATL": (
         _F + "costCGS/OATL/oatl_3agents_medium_6states_costs.txt",

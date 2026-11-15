@@ -14,6 +14,7 @@ OPERATOR_FORMS = {
     "ATLF": ("<1>", "F"),
     "IATL": ("<1>", "F"),
     "ATL_STAR": ("<<1>> ", "F"),
+    "ATL_STAR_F": ("<<1>> ", "F"),
     "Wallet_ATL": ("<<1>>", "F"),
     "OATL": ("<1><2>", "F"),
     "COTL": ("<1><2>", "F"),
@@ -26,6 +27,7 @@ OPERATOR_FORMS = {
     "OL": ("<J1>", "F"),
     "TOL": ("{J1}", "F"),
     "NatSL": ("E{1}x: (x, 1) ", "F"),
+    "SL1G_F": ("E x A y: (x, 1)(y, 2) ", "F"),
 }
 
 # logic -> binary operators it has (NatSL's one goal has none)
@@ -38,6 +40,7 @@ BINARY_OPERATORS = {
     "ATLF": ("U",),
     "IATL": ("U", "R"),
     "ATL_STAR": ("U",),
+    "ATL_STAR_F": ("U",),
     "Wallet_ATL": ("U",),
     "OATL": ("U", "R", "W"),
     "COTL": ("U", "R", "W"),
@@ -50,6 +53,7 @@ BINARY_OPERATORS = {
     "OL": ("U", "R", "W"),
     "TOL": ("U", "R", "W"),
     "NatSL": (),
+    "SL1G_F": ("U",),
 }
 
 # The CTL family writes a binary operator inside the path quantifier's brackets.

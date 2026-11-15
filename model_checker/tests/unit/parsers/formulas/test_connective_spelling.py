@@ -18,11 +18,14 @@ _WORDS += [("(p implies q)", "implies", "->"), ("(not p)", "not", "!")]
 @pytest.mark.parametrize("logic", CONNECTIVE_LOGICS)
 @pytest.mark.parametrize(("operand", "word", "symbol"), _WORDS)
 def test_word_connective_builds_the_symbol_tree(logic, operand, word, symbol):
-    """`p and q` has the tree of `p && q`; most parsers keep the word as the node label."""
+    """`p and q` has the tree of `p && q`; most parsers keep the word as the node label,
+    ATL_STAR_F and SL1G_F build the very same tree."""
     spelled = parse(logic, unary(logic, operand))
     assert spelled is not None, f"{logic} rejected '{word}'"
     expected = parse(logic, unary(logic, operand.replace(f"{word} ", symbol + " ")))
-    assert re.sub(rf"\b{word}\b", symbol, repr(spelled)) == repr(expected)
+    assert spelled == expected or re.sub(rf"\b{word}\b", symbol, repr(spelled)) == repr(
+        expected
+    )
 
 
 @pytest.mark.unit

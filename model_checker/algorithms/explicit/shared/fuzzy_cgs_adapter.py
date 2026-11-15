@@ -7,11 +7,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from fractions import Fraction
 from typing import cast
 
 from model_checker.algorithms.explicit.ATL_STAR import cgs_adapter
 from model_checker.fuzzy_sl import WCGS, to_value
+from model_checker.fuzzy_sl.model import JointAction, State
 from model_checker.parsers.game_structures.cgs.protocols import CGSProtocol
 
 
@@ -26,7 +28,7 @@ def adapt(cgs: CGSProtocol) -> WCGS:
     ts = cgs_adapter.adapt(cgs).transition_system
     agents = tuple(range(1, cgs.get_number_of_agents() + 1))
 
-    transitions: dict[tuple[str, tuple[str, ...]], str] = {}
+    transitions: dict[tuple[State, JointAction], State] = {}
     for (source, symbol), targets in ts.transitions.items():
         per_agent = dict(cast("frozenset[tuple[int, str]]", symbol))
         joint_action = tuple(per_agent[agent] for agent in agents)
@@ -36,10 +38,10 @@ def adapt(cgs: CGSProtocol) -> WCGS:
                 f"{sorted(map(str, targets))}; it must lead to one state"
             )
         (target,) = targets
-        transitions[(cast(str, source), joint_action)] = cast(str, target)
+        transitions[(source, joint_action)] = target
 
     props = [str(p) for p in cgs.atomic_propositions]
-    weights = {
+    weights: dict[State, Mapping[str, object]] = {
         str(cgs.get_state_name_by_index(index)): {
             prop: _exact(value) for prop, value in zip(props, row, strict=True)
         }
