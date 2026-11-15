@@ -26,6 +26,7 @@ from .formula import (
 from .model import WCGS
 from .model_adapter import adapt
 from .parser import ParseError, parse
+from .strategy_export import export_strategy
 from .values import (
     FunctionRegistry,
     QualityFunction,
@@ -54,6 +55,7 @@ __all__ = [
     "adapt",
     "check",
     "constants",
+    "export_strategy",
     "holds",
     "is_state_formula",
     "parse",

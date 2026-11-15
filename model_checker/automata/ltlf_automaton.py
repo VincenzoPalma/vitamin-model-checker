@@ -21,7 +21,7 @@ analogue of `product.py`'s `valuation_bdd`.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Hashable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Hashable, Iterable, Mapping, Sequence
 from itertools import product as cartesian_product
 
 from .automaton import Automaton, spot
@@ -63,7 +63,7 @@ def _domain_aps(name: str, domain: Sequence[Value]) -> tuple[str, ...]:
     return tuple(_selector_ap(name, value) for value in domain)
 
 
-def true_aps(name: str, value: Value, domain: Sequence[Value]) -> tuple[str, ...]:
+def true_aps(name: str, value: Value, domain: Collection[Value]) -> tuple[str, ...]:
     """Which of `_domain_aps(name, domain)` are true when atom `name` has `value`.
 
     The other half of `threshold_automaton`'s encoding contract: use this
@@ -93,7 +93,7 @@ def _atom_literals(name: str, value: Value, domain: Sequence[Value]) -> tuple[st
 
 def weighted_label(
     labeling: Callable[[Hashable], Mapping[str, Value]],
-    value_domains: Mapping[str, Sequence[Value]],
+    value_domains: Mapping[str, Collection[Value]],
 ) -> Callable[[Hashable, Hashable], Iterable[str]]:
     """Build a `product()` `label` callable from a transition system's
     real-valued state labeling.

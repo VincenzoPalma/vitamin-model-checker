@@ -57,7 +57,9 @@ class Witness:
     (the existentially-quantified/coalition agents); `start` is the
     product state `(model_state, automaton_state)` to read it from -- the
     automaton state is the memory the sentence's temporal structure needs.
-    `move(agent)` reads one agent's own action out of it.
+    `move(agent)` reads one agent's own action out of it. `value` is what
+    the strategy guarantees from the state it was synthesized at (kept
+    unchanged by `advance`).
 
     `nested` carries, for every `Coalition`/`Quantify` eliminated out of
     this sentence's own path formula, that inner sentence's own witness at
@@ -72,6 +74,7 @@ class Witness:
     start: tuple[State, int]
     block_spec: automata.BlockSpec
     product_ts: automata.TransitionSystem
+    value: Value
     nested: dict[str, dict[State, Witness]] = field(default_factory=dict)
 
     def move(self, agent: Hashable) -> Value | Hashable | None:
@@ -343,9 +346,7 @@ def _solve_sentence(
             for name in used_names
         }
 
-    label = automata.weighted_label(
-        labeling, {name: tuple(sorted(d)) for name, d in value_domains.items()}
-    )
+    label = automata.weighted_label(labeling, value_domains)
 
     # Candidates from `flat` under the exact domains `threshold_automaton`
     # gets, not from the original path formula: there a nested sentence
@@ -391,6 +392,7 @@ def _solve_sentence(
                 start=(state, aut_init),
                 block_spec=block_spec,
                 product_ts=product_ts,
+                value=v,
                 nested=nested,
             )
         remaining -= won_now

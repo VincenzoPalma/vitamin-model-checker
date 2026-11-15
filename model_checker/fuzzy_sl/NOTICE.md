@@ -8,5 +8,5 @@ is **different** from this repository's own license (see the top-level
 `LICENSE` file). Only the code under `model_checker/fuzzy_sl/` is covered by
 the MIT terms; the rest of this repository is not.
 
-Vendored version: `fuzzy-sl` commit `a19a3b2`, with imports pointed at
+Vendored version: `fuzzy-sl` commit `24e5557`, with imports pointed at
 `model_checker.automata`.
