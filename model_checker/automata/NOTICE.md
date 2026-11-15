@@ -7,3 +7,6 @@ distributed under the **MIT License** (see `LICENSE` in this directory),
 which is **different** from this repository's own license (see the top-level
 `LICENSE` file). Only the code under `model_checker/automata/` is covered by
 the MIT terms; the rest of this repository is not.
+
+Vendored version: `automata-lib-vitamin` v0.2.2, merged into this copy, which
+keeps its own comment and formatting style.
