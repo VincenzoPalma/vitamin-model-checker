@@ -1,0 +1,25 @@
+name: Engine image
+
+on:
+  push:
+    branches: [local]
+    paths:
+      - "docker/engine/**"
+      - "pyproject.toml"
+      - "model_checker/**"
+      - ".github/workflows/engine-image.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: docker build -f docker/engine/Dockerfile -t vitamin-engine .
+      - name: Smoke test
+        run: docker run --rm vitamin-engine
