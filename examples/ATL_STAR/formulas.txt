@@ -8,4 +8,4 @@
 # combined under one coalition, unrestricted nesting classical ATL does not
 # allow either (it always takes exactly one temporal operator right after
 # the coalition).
-<<1>> (X goal & F goal)
+<<1>> (X goal && F goal)
