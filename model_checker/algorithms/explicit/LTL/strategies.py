@@ -70,7 +70,7 @@ def generate_strategies(
                         break
 
                     total_complexity = sum(
-                        len(condition.split()) + (1 if "!" in condition else 0)
+                        strategies_base.condition_size(condition)
                         for condition, _ in combination
                     )
                     if total_complexity == k:
@@ -125,8 +125,9 @@ def initialize(
     logger.debug("Formula natATL: %s", formula)
     logger.debug("Formula CTL: %s", CTLformula)
 
+    if isinstance(k, bool) or not isinstance(k, int) or k < 1:
+        raise ValueError(f"[VALIDATION] k must be an integer >= 1, got {k!r}")
     logger.debug("Complexity Bound: %d", k)
-
     num_agents = cgs.get_number_of_agents()
     cgs_actions.validate_agent_numbers(agents, num_agents)
     actions_per_agent = cgs_actions.extract_actions_for_agents(
@@ -159,8 +160,11 @@ def generate_deviations_for_agent(
 ) -> list[dict]:
     import itertools
 
-    C = ["and", "or"]
-    conditions = list(strategies_base.generate_conditions(atomic_propositions, C, k))
+    conditions = list(
+        strategies_base.generate_conditions(
+            atomic_propositions, strategies_base.CONDITION_CONNECTIVES, k
+        )
+    )
     all_candidates = []
     for condition in conditions:
         neg_conditions = list(
@@ -170,8 +174,7 @@ def generate_deviations_for_agent(
         for cond in all_conditions:
             for action in agent_actions_for_agent:
                 candidate = (cond, action)
-                complexity = len(cond.split()) + (1 if "!" in cond else 0)
-                if complexity <= k:
+                if strategies_base.condition_size(cond) <= k:
                     all_candidates.append(candidate)
 
     deviations = []
@@ -181,8 +184,8 @@ def generate_deviations_for_agent(
         candidate_strategy = {"condition_action_pairs": list(candidate_tuple)}
         if candidate_strategy != single_strategy:
             total_complexity = sum(
-                len(pair[0].split()) + (1 if "!" in pair[0] else 0)
-                for pair in candidate_tuple
+                strategies_base.condition_size(condition)
+                for condition, _ in candidate_tuple
             )
             if total_complexity <= k:
                 deviations.append(candidate_strategy)

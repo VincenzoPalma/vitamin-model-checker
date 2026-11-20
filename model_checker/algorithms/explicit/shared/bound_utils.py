@@ -1,26 +1,12 @@
-"""Bound vectors for RBATL and RABATL: parse `<J><b1,b2,...>Op`, and increment or
-subtract vectors in lexicographic order."""
+"""Bound vectors for RBATL and RABATL: parse `<J><b1,b2,...>Op`."""
 
 from model_checker.algorithms.explicit.shared.coalition_constraints import (
     parse_coalition_and_bound_vector,
 )
 
 
-def inc_bound(current_bound: list[int], max_bound: list[int]) -> bool:
-    """Increment current_bound lexicographically; return False when past max_bound."""
-    for i in range(len(current_bound)):
-        if max_bound[i] == 0:
-            current_bound[i] = 0
-            continue
-        current_bound[i] += 1
-        if current_bound[i] <= max_bound[i]:
-            return True
-        current_bound[i] = 0
-    return False
-
-
-def extract_coalition_and_bound(formula_node_value: str) -> tuple[str, list[int]]:
-    """Parse <J><b1,b2,...> into (coalition_str, [b1,b2,...]).
+def extract_coalition_and_bound(formula_node_value: str, cgs) -> tuple[str, list[int]]:
+    """Parse <J><b1,b2,...> into (coalition_str, [b1,b2,...]) for the model `cgs`.
 
     Raises ValueError with a descriptive message when the format is invalid.
     """
@@ -28,5 +14,12 @@ def extract_coalition_and_bound(formula_node_value: str) -> tuple[str, list[int]
     if any(bound < 0 for bound in bounds):
         raise ValueError(
             f"Invalid coalition-bound format '{formula_node_value}': bounds must be non-negative integers."
+        )
+    # A cost is one vector (RBATL) or one row per resource (RABATL).
+    resources = max(map(len, cgs.cost_for_action.values()), default=0)
+    if resources and len(bounds) > resources:
+        raise ValueError(
+            f"[VALIDATION] Bound {bounds} has {len(bounds)} values, but the "
+            f"model's costs have {resources} resource(s)."
         )
     return coalition, bounds

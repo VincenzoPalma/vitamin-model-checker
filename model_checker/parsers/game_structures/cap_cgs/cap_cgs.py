@@ -6,7 +6,7 @@ only, so its names follow CapATL's reserved words.
 
 import numpy as np
 
-from model_checker.parsers.game_structures.cgs import cgs_parser
+from model_checker.parsers.game_structures.cgs import cgs_parser, cgs_validation
 from model_checker.parsers.game_structures.cgs.cgs import CGS
 from model_checker.parsers.syntax_patterns import (
     CAPATL_KNOWLEDGE_NAME_RE,
@@ -73,6 +73,19 @@ class CapCGS(CGS):
         def process_capacities_assignment(line):
             if line:
                 values = line.split()
+                agent = len(self.capacities_assignment) + 1
+                for column, value in enumerate(values, start=1):
+                    if value not in ("0", "1"):
+                        # Capacities may come later in the file, so the name may be unknown.
+                        where = (
+                            f"capacity {capacities_list[column - 1]}"
+                            if column <= len(capacities_list)
+                            else f"column {column}"
+                        )
+                        raise ValueError(
+                            f"Capacities_assignment cell {value!r} (agent {agent}, "
+                            f"{where}) is not 0 or 1."
+                        )
                 if values:
                     self.capacities_assignment.append(values)
 
@@ -140,6 +153,35 @@ class CapCGS(CGS):
             self.graph.append(processed_row)
 
         self.actions = list(set(actions))
+
+    def validate_model_structure(self) -> None:
+        """Also check the Capacities_assignment and Actions_for_capacities sections."""
+        errors = cgs_validation.collect_model_structure_errors(self)
+        if not errors:
+            rows = self.capacities_assignment
+            if len(rows) != self.get_number_of_agents():
+                errors.append(
+                    f"Capacities_assignment has {len(rows)} row(s); expected "
+                    f"{self.get_number_of_agents()} (one per agent)"
+                )
+            elif len(rows[0]) != len(self.capacities_list):
+                errors.append(
+                    f"Capacities_assignment has {len(rows[0])} column(s); expected "
+                    f"{len(self.capacities_list)} (one per capacity)"
+                )
+        if not errors:
+            with_actions = {row[0] for row in self.action_capacities}
+            for agent, *capacities in self.get_capacities_assignment():
+                if not capacities:
+                    errors.append(
+                        f"Agent {agent} has no capacity in Capacities_assignment"
+                    )
+                errors.extend(
+                    f"Capacity '{c}' of agent {agent} has no line in Actions_for_capacities"
+                    for c in capacities
+                    if c not in with_actions
+                )
+        cgs_validation.raise_structure_errors(errors)
 
     # --- Capacity Accessor Methods ---
 

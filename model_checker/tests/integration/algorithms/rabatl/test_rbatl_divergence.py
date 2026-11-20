@@ -31,27 +31,28 @@ class TestRABATLVsRBATLDivergence:
     def test_split_matrix_coalition_sum_differs_from_flat_costs(
         self, rabatl_fixture, rbatl_fixture
     ):
-        formula = "<1><1,1,1>X r"
+        formula = "<1><1,1>X r"
         rab_states = extract_states_from_result(
             _core_rabatl_checking(rabatl_fixture, formula)
         )
         rba_states = extract_states_from_result(
             _core_rbatl_checking(rbatl_fixture, formula)
         )
-        assert rab_states == {"s0", "s1", "s2", "s3"}
-        assert rba_states == {"s0", "s2"}
+        assert rab_states == {"s1", "s3"}
+        assert rba_states == set()
         assert rab_states != rba_states
 
     def test_multi_agent_coalition_bound_vector_divergence(
         self, rabatl_fixture, rbatl_fixture
     ):
-        formula = "<1,2><1,1,1>F r"
+        """The loops at s1 and s3 cost 1 per resource in RABATL but 2 in RBATL; only
+        RBATL has s2, where AA reaches r and its cheapest joint action AA^ costs 1."""
+        formula = "<1,2><1,1>X r"
         rab_states = extract_states_from_result(
             _core_rabatl_checking(rabatl_fixture, formula)
         )
         rba_states = extract_states_from_result(
             _core_rbatl_checking(rbatl_fixture, formula)
         )
-        assert rab_states == {"s1", "s2", "s3", "s4"}
-        assert rba_states == {"s0", "s1", "s2", "s3", "s4"}
-        assert rab_states != rba_states
+        assert rab_states == {"s1", "s3"}
+        assert rba_states == {"s2"}

@@ -17,24 +17,22 @@ from model_checker.algorithms.explicit.shared.timed_ast_operators import (
 from model_checker.algorithms.explicit.TOL.operators import (
     handle_eventually,
     handle_globally,
-    handle_next,
     handle_release,
     handle_until,
     handle_weak,
 )
 from model_checker.parsers.formula_parser_factory import FormulaParserFactory
-from model_checker.parsers.formulas.TOL.parser import (
+from model_checker.parsers.formulas.timed_ast import (
     AtomicProp,
     Binary,
     BooleanConst,
     ClockExpr,
-    DemonicBinary,
-    DemonicOp,
     Expr,
     FreezeExpr,
     SimpleTimeExpr,
     Unary,
 )
+from model_checker.parsers.formulas.TOL.parser import DemonicBinary, DemonicOp
 
 if TYPE_CHECKING:
     from model_checker.parsers.game_structures.timed_cgs.timed_cgs import TimedCGS
@@ -52,11 +50,11 @@ def solve_tree(
         parser = FormulaParserFactory.get_parser_instance("TOL")
 
     if isinstance(node, AtomicProp):
-        eval_atomic_prop(tcgs, node)
+        eval_atomic_prop(tcgs, zone_graph, node)
         return
 
     if isinstance(node, BooleanConst):
-        eval_boolean_const(tcgs, node)
+        eval_boolean_const(zone_graph, node)
         return
 
     if isinstance(node, SimpleTimeExpr):
@@ -69,19 +67,17 @@ def solve_tree(
     solve_ast_children(tcgs, zone_graph, node, _recurse)
 
     if isinstance(node, Unary) and parser.verify("NOT", node.op):
-        handle_not(tcgs, node)
+        handle_not(zone_graph, node)
     elif isinstance(node, Binary):
         if parser.verify("OR", node.op):
             handle_or(node)
         elif parser.verify("AND", node.op):
             handle_and(node)
         elif parser.verify("IMPLIES", node.op):
-            handle_implies(tcgs, node)
+            handle_implies(zone_graph, node)
     elif isinstance(node, DemonicOp):
         if parser.verify("GLOBALLY", node.op):
             handle_globally(tcgs, zone_graph, node)
-        elif parser.verify("NEXT", node.op):
-            handle_next(tcgs, zone_graph, node)
         elif parser.verify("EVENTUALLY", node.op):
             handle_eventually(tcgs, zone_graph, node)
     elif isinstance(node, DemonicBinary):
@@ -94,4 +90,4 @@ def solve_tree(
     elif isinstance(node, ClockExpr):
         handle_clock_expr(tcgs, zone_graph, node)
     elif isinstance(node, FreezeExpr):
-        handle_freeze(tcgs, zone_graph, node)
+        handle_freeze(zone_graph, node)

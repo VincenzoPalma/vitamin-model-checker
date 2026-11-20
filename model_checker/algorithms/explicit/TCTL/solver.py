@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING
 
-from model_checker.algorithms.explicit.TCTL.evaluators import (
+from model_checker.algorithms.explicit.shared.timed_ast_operators import (
     eval_atomic_prop,
     eval_boolean_const,
     eval_simple_time_expr,
@@ -23,14 +23,14 @@ from model_checker.algorithms.explicit.TCTL.operators import (
     handle_eu,
 )
 from model_checker.parsers.formula_parser_factory import FormulaParserFactory
-from model_checker.parsers.formulas.TCTL import (
+from model_checker.parsers.formulas.TCTL import QuantifiedPath
+from model_checker.parsers.formulas.timed_ast import (
     AtomicProp,
     Binary,
     BooleanConst,
     ClockExpr,
     Expr,
     FreezeExpr,
-    QuantifiedPath,
     SimpleTimeExpr,
     Unary,
 )
@@ -72,7 +72,7 @@ def solve_tree(
     elif isinstance(node, ClockExpr):
         handle_clock_expr(tcgs, zone_graph, node)
     elif isinstance(node, FreezeExpr):
-        handle_freeze(tcgs, zone_graph, node)
+        handle_freeze(zone_graph, node)
     elif isinstance(node, Binary):
         if parser.verify("OR", node.op):
             handle_or(node)
@@ -84,24 +84,24 @@ def solve_tree(
         if parser.verify("EXIST", node.quantifier) and parser.verify(
             "EVENTUALLY", node.quantifier
         ):
-            handle_ef(tcgs, zone_graph, node)
+            handle_ef(zone_graph, node)
         elif parser.verify("FORALL", node.quantifier) and parser.verify(
             "EVENTUALLY", node.quantifier
         ):
-            handle_af(tcgs, zone_graph, node)
+            handle_af(zone_graph, node)
         elif parser.verify("EXIST", node.quantifier) and parser.verify(
             "GLOBALLY", node.quantifier
         ):
-            handle_eg(tcgs, zone_graph, node)
+            handle_eg(zone_graph, node)
         elif parser.verify("FORALL", node.quantifier) and parser.verify(
             "GLOBALLY", node.quantifier
         ):
-            handle_ag(tcgs, zone_graph, node)
+            handle_ag(zone_graph, node)
         elif parser.verify("EXIST", node.quantifier) and parser.verify(
             "UNTIL", node.formula.op
         ):
-            handle_eu(tcgs, zone_graph, node)
+            handle_eu(zone_graph, node)
         elif parser.verify("FORALL", node.quantifier) and parser.verify(
             "UNTIL", node.formula.op
         ):
-            handle_au(tcgs, zone_graph, node)
+            handle_au(zone_graph, node)

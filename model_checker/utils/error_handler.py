@@ -68,6 +68,7 @@ _TAGGED_ERROR_PREFIXES = (
     ("[SEMANTIC]", functools.partial(create_error_response, "semantic")),
     ("[SYNTAX]", functools.partial(create_error_response, "syntax")),
     ("[MODEL]", functools.partial(create_error_response, "model")),
+    ("[VALIDATION]", functools.partial(create_error_response, "validation")),
 )
 
 _SYNTAX_KEYWORDS = (
@@ -81,6 +82,22 @@ _SYNTAX_KEYWORDS = (
 )
 
 _SEMANTIC_KEYWORDS = ("atom", "does not exist", "not found", "unknown")
+
+
+def tagged_error_response(message: str) -> dict[str, Any] | None:
+    """The error dict a message that starts with a tag asks for, else None."""
+    for tag, factory in _TAGGED_ERROR_PREFIXES:
+        if message.startswith(tag):
+            return factory(message.removeprefix(tag).strip())
+    return None
+
+
+def as_model_error(exc: Exception) -> str:
+    """The message of `exc` tagged as a model error, unless it starts with a tag."""
+    message = str(exc) or f"{type(exc).__name__} with no message"
+    if tagged_error_response(message) is not None:
+        return message
+    return f"[MODEL] {message}"
 
 
 def value_error_to_response(error_msg: str) -> dict[str, Any]:

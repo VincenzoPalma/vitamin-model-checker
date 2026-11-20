@@ -1,16 +1,15 @@
-"""NatATL model checker with recall strategies: builds the execution tree, prunes it
-by regex and boolean conditions, and checks it with CTL."""
+"""NatATL model checker with recall strategies: rules whose conditions are patterns
+over the history, each profile checked with CTL on the model restricted to it."""
 
 import logging
 from typing import Any
 
+from model_checker.algorithms.explicit.NatATL.initialization import initialize
 from model_checker.algorithms.explicit.NatATL.Recall.solver import (
     solve_natatl_recall,
 )
-from model_checker.algorithms.explicit.NatATL.Recall.strategy_initialization import (  # noqa: E501
-    initialize,
-)
 from model_checker.engine.execution import create_model_checking_entry
+from model_checker.parsers.game_structures.cgs import cgs_validation
 from model_checker.parsers.game_structures.cgs.cgs import CGS
 from model_checker.utils.error_handler import create_error_response
 
@@ -20,31 +19,14 @@ logger = logging.getLogger(__name__)
 def _core_natatl_recall_checking(cgs: CGS, formula: str) -> dict[str, Any]:
     """Core logic for NatATL with Recall."""
     try:
-        # Initialize model and parse formula
-        (
-            k,
-            agent_actions,
-            actions_list,
-            atomic_propositions,
-            ctl_formula,
-            agents,
-            filename,
-            model_parser,
-        ) = initialize(cgs.filename, formula, cgs=cgs)
-
-        # Solve using the solver module
-        result = solve_natatl_recall(
-            k,
-            agent_actions,
-            actions_list,
-            atomic_propositions,
-            ctl_formula,
-            agents,
-            model_parser,
-            filename,
+        # Every recall strategy ends with (true*, IDLE), so idle must be available
+        # in every state; memoryless strategies end with a true rule instead.
+        cgs_validation.validate_nat_idle_requirements(
+            cgs.graph, cgs.get_number_of_agents()
         )
-
-        return result
+        model_path = cgs.filename
+        k, ctl_formula, agents, _ = initialize(model_path, formula, cgs=cgs)
+        return solve_natatl_recall(k, ctl_formula, agents, cgs, model_path)
 
     except ValueError as e:
         error_msg = str(e)

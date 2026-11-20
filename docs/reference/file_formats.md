@@ -27,7 +27,8 @@ integrates them into this repository). It does not define operator denotations; 
 
 Model files are plain `.txt` files. The loader detects a type from the section
 headers and, for ICTL, from the `Transition` cells; the rules are in
-[Table 1](#supported-model-types).
+[Table 1](#supported-model-types). A file that breaks a rule on this page is
+refused on load with an error of type `model` whose message names the problem.
 
 Use a simple file name such as:
 
@@ -125,8 +126,9 @@ Accepted cell values:
 - `0`: no transition,
 - a joint action profile for all agents (see formats below),
 - a comma-separated list of joint profiles such as `AC,AD` or `A|C,A|D`,
-- `*`: wildcard, meaning any joint action allows the transition; it is read as a
-  profile with `*` in every agent position.
+- `*`: wildcard, meaning any joint action allows the transition to the cell's
+  column; it is read as a profile with `*` in every agent position. On the
+  diagonal it is a self-loop.
 
 Table 2 shows the two joint action formats. They are equivalent: both encode one
 move per agent, in agent order 1..n.
@@ -143,11 +145,39 @@ Algorithms normalize every profile to the explicit `|`-separated form before coa
 A profile with too few or too many actions still loads. It fails when a checker reads the actions. For example, with 2 agents and the too-short cell `A`, ATL reports "Action joint 'A' in cell 'A' has 1 action(s); expected 2 (one per agent).". CTL does not read actions, so on such a file it returns a result.
 
 Every state must have at least one outgoing transition (total / serial relation).
-Use a self-loop such as `*` on terminal states. Models that leave a row entirely
+Use a self-loop on terminal states, for example `*` on the diagonal. Models that leave a row entirely
 `0` are rejected at load time. CTL/ATL-style operators assume infinite paths
 (Baier/Katoen); without a successor, next-time modalities are ill-defined and
 universal next can hold vacuously. A self-loop models a terminal situation as
 "remain forever."
+
+Every combination of the agents' available actions needs a transition. An agent's
+available actions in a state are the actions it plays in some cell of the state's
+row. A `*` cell, or a `*` in one agent's position of a profile (in `*N`, agent 1
+plays anything and agent 2 plays `N`), covers every action of that agent. For
+example, a row that lists only `AC` and `BD` makes `A` and `B` available to agent 1
+and `C` and `D` to agent 2, so `AD` and `BC` need a cell too. The loader rejects a
+row that misses one, naming the state, the number of combinations missing and up
+to three of them, such as `A|D, B|C`. It does not add a self-loop for them: which
+successor a combination has belongs to the model. Rows whose cells are edge costs
+(`Transition_With_Costs`) are not checked, and a row that is all `0` gets only the
+"no outgoing transitions" error above.
+
+The rule follows the concurrent game structures of JACM 2002 (Def. 2.1, pp.
+677-678), PRIMA 2024 (Def. 1, p. 3) and AAMAS 2024 for CapATL (Def. 2.1, p. 124),
+which give a transition for every combination of available actions. Without it,
+a row is not a game: with `AC` leading to a state where `g` holds and `BD` to one
+where it does not, `<1>X g` and `<2>X !g` would both hold.
+
+OATL and IATL accept such rows, because their papers make the transition function
+partial: AAMAS 2024 for OATL (Def. 2, p. 272) and KR 2025 for IATL (p. 187). There,
+a combination that no cell lists is not available in that state. OL and TOL are
+OATL with every agent in the coalition, so they accept them too. CTL and TCTL accept
+them because their models are graphs with no agents. A BCGS model, which only IATL
+uses, is never checked. The other models are exempt only when loaded for one of
+these logics (`partial_transitions` in the logic's metadata, read by
+`create_model_parser_for_logic`); loaded for ATL, LTL, NatATL, RBATL, RABATL,
+CapATL or with no logic, they are checked.
 
 ### State and label sections
 
@@ -169,20 +199,25 @@ any of these three sections:
 - `Costs_for_actions`: one line per joint action, `action state$cost[:cost...]`.
   Several states share a line, joined by `;`: `AA s0$1:1;s2$1:1`. The values after
   `$`, separated by `:`, form the cost vector: value `i` is the cost in resource
-  `i`, and RBATL compares it with bound `i` of the formula. A line with a third
+  `i`, and RBATL adds it up along the path and compares the sum with bound `i` of
+  the formula. A line with a third
   space-separated token or a negative cost is an error. RBATL, RABATL and TOL
   accept a cost of 0; OL and OATL reject it (see [OATL](../algorithms/oatl.md#demon-pre-image)).
+  The action `*` prices a `*` cell (any joint action) of `Transition`: `* s1$2`
+  gives that cell in `s1` the cost 2. In OL and OATL this cost must also be at
+  least 1, so `* s1$0` is an error.
 - `Costs_for_actions_split`: the same line, with each `:`-separated group split
   again by `,` into one cost per agent: in `AA s0$1,2:3,4`, agent 1 pays 1 of
   resource 1 and 3 of resource 2, and agent 2 pays 2 and 4. RABATL adds the costs of the coalition's
-  agents for each resource.
+  agents for each resource; a row with fewer costs than the number of a coalition
+  member is a `model` error.
 - `Transition_With_Costs`: replaces `Transition`; a square matrix whose cells are
   edge costs, `0` for no edge. It gives no actions, so OATL accepts it only for a
   coalition of all agents and otherwise reports "a Transition_With_Costs model gives
   only edge costs; use Transition with Costs_for_actions"
   (`model_checker/algorithms/explicit/OATL/preimage.py`). In OL and OATL a cell
   whose costs add up to 0 or less, such as `0:0`, `00` or `-1`, is an error, and
-  so is `*`; TOL reads `*` as a self-loop of cost 0
+  so is `*`; TOL reads `*` as an edge of cost 0
   ([TOL grade 0](../algorithms/tol.md#grade-0)). See
   [OL](../algorithms/ol.md#how-a-check-runs).
 
@@ -227,9 +262,10 @@ cop B
   CapATL reads as its knowledge operator.
 - `Capacities_assignment`: `agents x capacities` matrix of `0`/`1` values.
   Row `i` is agent `i`; column `j` is capacity `j` (same order as `Capacities`).
+  Any other value is a load error that names it.
 - `Actions_for_capacities`: one line per capacity, `capacity_name action1 action2 ...`,
   listing the actions that capacity enables
-  (`model_checker/algorithms/explicit/CapATL/combinatorics.py`).
+  (`model_checker/algorithms/explicit/CapATL/game.py`).
 
 ## fuzzyCGS sections
 
@@ -296,13 +332,14 @@ actions; Table 3 lists them:
 | `R` | transition only |
 | `P` | knowledge preorder only |
 | `P,R` | both (typical diagonal) |
+| `*` | transition only, like `R` (as in the other logics) |
 
-Every diagonal cell must be `P` or `P,R`, because the order `P` is reflexive;
-otherwise ICTL reports "The graph is not reflective." (the message's word for
-reflexive). A `*` on the diagonal gives that error; elsewhere a `*` loads with no
-error and is read as no relation, so write `0`. ICTL also checks
-the confluence conditions C1 and C2 between `P` and `R`; they and the other model
-checks are in the [ICTL algorithm](../algorithms/ictl.md).
+Any other cell is a load error that names it. Every diagonal cell must be `P` or
+`P,R`, because the order `P` is reflexive; otherwise ICTL reports "The graph is
+not reflective." (the message's word for reflexive), so a `*` on the diagonal
+gives that error. ICTL also checks the confluence conditions C1 and C2 between
+`P` and `R`; they and the other model checks are in the
+[ICTL algorithm](../algorithms/ictl.md).
 
 ## BCGS sections (IATL)
 

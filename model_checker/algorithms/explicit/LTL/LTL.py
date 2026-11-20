@@ -21,13 +21,16 @@ from model_checker.algorithms.explicit.SolutionConcepts.Solution_Concepts import
 )
 from model_checker.models.model_factory import create_model_parser_for_logic
 from model_checker.parsers.formula_parser_factory import FormulaParserFactory
-from model_checker.parsers.game_structures.cgs import CGSProtocol
+from model_checker.parsers.game_structures.cgs import CGSProtocol, cgs_actions
 from model_checker.utils.error_handler import (
     create_error_response,
     value_error_to_response,
 )
 
 logger = logging.getLogger(__name__)
+
+# Strategy complexity bound used when the caller gives none.
+DEFAULT_STRATEGY_BOUND = 5
 
 
 def _validate_ltl_input(formula: str, filename: str | None) -> dict[str, Any] | None:
@@ -247,6 +250,7 @@ def model_checking_wins_some_nash(
     """Test one strategy profile for one agent: Satisfiability is False if the agent
     meets the CTL goal and the profile is a Nash equilibrium, else True."""
     result = {}
+    cgs_actions.validate_agent_numbers([target_agent], cgs.get_number_of_agents())
 
     if pruning(
         cgs, model, [target_agent], CTLformula, current_strategy
@@ -281,6 +285,7 @@ def model_checking_lose_some_nash(
     """Test one strategy profile for one agent: Satisfiability is True if the agent
     misses the CTL goal and the profile is a Nash equilibrium, else False."""
     result = {}
+    cgs_actions.validate_agent_numbers([target_agent], cgs.get_number_of_agents())
 
     if not pruning(
         cgs, model, [target_agent], CTLformula, current_strategy
@@ -301,8 +306,15 @@ def model_checking_lose_some_nash(
     return result
 
 
-def model_checking(formula: str, filename: str) -> dict[str, Any]:
-    """Main entry point for LTL sure-win checking (k=5, all agents)."""
+def model_checking(
+    formula: str,
+    filename: str,
+    *,
+    k: int = DEFAULT_STRATEGY_BOUND,
+    agents: list[int] | None = None,
+) -> dict[str, Any]:
+    """Whether the coalition (all agents by default) has a sure-win strategy of
+    complexity at most k for the LTL formula."""
     err = _validate_ltl_input(formula, filename)
     if err is not None:
         return err
@@ -313,8 +325,8 @@ def model_checking(formula: str, filename: str) -> dict[str, Any]:
             return parse_err
 
         cgs = _load_ltl_model(filename)
-        k = 5
-        agents = list(range(1, cgs.get_number_of_agents() + 1))
+        if agents is None:
+            agents = list(range(1, cgs.get_number_of_agents() + 1))
         return _run_sure_win_and_format_result(filename, formula, k, agents, cgs)
 
     except FileNotFoundError:

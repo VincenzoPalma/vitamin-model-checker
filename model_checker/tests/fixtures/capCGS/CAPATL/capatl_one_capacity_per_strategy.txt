@@ -1,0 +1,43 @@
+# MODEL: Agent 2 must keep one capacity for its whole strategy
+
+# PURPOSE: Agent 2 needs A (cap) in sL and B (cop) in sR, so <{2}>F goal is False at s0.
+
+# LOGIC: CAPATL
+
+# DESCRIPTION: Agent 1 picks sL or sR; D is in both capacities of agent 2.
+
+Transition
+0 L* R* 0 0
+0 0 0 *A *B,*D
+0 0 0 *B *A,*D
+0 0 0 * 0
+0 0 0 0 *
+Unknown_Transition_by
+0 0 0 0 0
+0 0 0 0 0
+0 0 0 0 0
+0 0 0 0 0
+0 0 0 0 0
+Name_State
+s0 sL sR goal bad
+Initial_State
+s0
+Atomic_propositions
+goal lost
+Labelling
+0 0
+0 0
+0 0
+1 0
+0 1
+Capacities
+o cap cop
+Capacities_assignment
+1 0 0
+0 1 1
+Actions_for_capacities
+o L R
+cap A D
+cop B D
+Number_of_agents
+2

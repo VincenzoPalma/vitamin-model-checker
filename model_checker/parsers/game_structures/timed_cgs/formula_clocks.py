@@ -1,18 +1,31 @@
-"""Formula clocks introduced by timed formulas (freeze / real-time guards).
+"""Clocks that only a timed formula names (freeze, guards); they join the model's
+clocks before the region graph is built."""
 
-These clocks are not part of the automaton declaration; they are added to the
-timedCGS before the zone graph is built so freeze quantification can be evaluated.
-"""
+from collections.abc import Iterator
 
 from model_checker.parsers.game_structures.timed_cgs.constraint_syntax import (
-    BOUND_CONSTANT_RE,
     CLOCK_BOUND_PREFIX_RE,
 )
+from model_checker.parsers.game_structures.timed_cgs.DBM import DBMAdapter
+
+_CHILD_ATTRS = ("operand", "left", "right", "formula", "subject")
 
 
-def _clock_from_constraint(text: str) -> str | None:
-    match = CLOCK_BOUND_PREFIX_RE.match(str(text))
-    return match.group(1) if match else None
+def ast_children(node) -> Iterator:
+    """The subformula nodes of ``node``."""
+    for attr in _CHILD_ATTRS:
+        child = getattr(node, attr, None)
+        if child is not None:
+            yield child
+
+
+def _nodes(node) -> Iterator:
+    """``node`` and every node below it."""
+    if node is None:
+        return
+    yield node
+    for child in ast_children(node):
+        yield from _nodes(child)
 
 
 def _is_freeze_node(node) -> bool:
@@ -23,67 +36,51 @@ def _is_freeze_node(node) -> bool:
     )
 
 
+def _constraint_text(node) -> str | None:
+    """The clock constraint of a guard node, such as ``x<=3``, if it has one."""
+    constraints = getattr(node, "constraints", None)
+    if constraints is None:
+        return None
+    return "".join(constraints) if isinstance(constraints, tuple) else str(constraints)
+
+
+def _named_clock(node) -> str | None:
+    """The clock a freeze or clock constraint node names, if any."""
+    if _is_freeze_node(node):
+        return node.clock
+    text = _constraint_text(node)
+    if text is None:
+        return None
+    match = CLOCK_BOUND_PREFIX_RE.match(text)
+    return match.group(1) if match else None
+
+
 def collect_formula_clocks(node, model_clocks: set[str]) -> tuple[str, ...]:
     """Return freeze/guard clock names that appear in the formula but not the model."""
-    if node is None:
-        return ()
-    found: set[str] = set()
-    _walk_formula_clocks(node, model_clocks, found)
-    return tuple(sorted(found))
+    found = {clock for child in _nodes(node) if (clock := _named_clock(child))}
+    return tuple(sorted(found - model_clocks))
 
 
-def max_constants_from_formula(node, clocks_dict: dict[str, int]) -> list[int]:
-    """Each clock's largest constant in the formula guards, so zone extrapolation
-    keeps the distinctions the formula needs."""
-    maxima = [0] * len(clocks_dict)
-    if node is None:
-        return maxima
-    _walk_formula_max_constants(node, clocks_dict, maxima)
-    return maxima
+def formula_freeze_clocks(node) -> tuple[str, ...]:
+    """The clocks the formula's freezes reset, sorted."""
+    return tuple(
+        sorted({child.clock for child in _nodes(node) if _is_freeze_node(child)})
+    )
 
 
-def _record_constraint_maxima(
-    text: str, clocks_dict: dict[str, int], maxima: list[int]
-) -> None:
-    for clock, value_str in BOUND_CONSTANT_RE.findall(str(text)):
-        if clock in clocks_dict:
-            idx = clocks_dict[clock]
-            maxima[idx] = max(maxima[idx], int(value_str))
-
-
-def _walk_formula_max_constants(
-    node, clocks_dict: dict[str, int], maxima: list[int]
-) -> None:
-    constraints = getattr(node, "constraints", None)
-    if constraints is not None:
-        if isinstance(constraints, tuple):
-            _record_constraint_maxima("".join(constraints), clocks_dict, maxima)
-        else:
-            _record_constraint_maxima(str(constraints), clocks_dict, maxima)
-
-    for attr in ("operand", "left", "right", "formula", "subject"):
-        child = getattr(node, attr, None)
-        if child is not None:
-            _walk_formula_max_constants(child, clocks_dict, maxima)
-
-
-def _walk_formula_clocks(node, model_clocks: set[str], found: set[str]) -> None:
-    if _is_freeze_node(node):
-        if node.clock not in model_clocks:
-            found.add(node.clock)
-    elif type(node).__name__ == "SimpleTimeExpr":
-        clock = _clock_from_constraint("".join(node.constraints))
-        if clock and clock not in model_clocks:
-            found.add(clock)
-    elif type(node).__name__ == "ClockExpr":
-        clock = _clock_from_constraint(node.constraints)
-        if clock and clock not in model_clocks:
-            found.add(clock)
-
-    for attr in ("operand", "left", "right", "formula", "subject"):
-        child = getattr(node, attr, None)
-        if child is not None:
-            _walk_formula_clocks(child, model_clocks, found)
+def formula_clock_constants(node, clocks_dict: dict[str, int]) -> dict[str, int]:
+    """The largest constant each clock is compared with in the formula's guards."""
+    constants: dict[str, int] = {}
+    names = {index + 1: clock for clock, index in clocks_dict.items()}
+    for child in _nodes(node):
+        text = _constraint_text(child)
+        if text is None:
+            continue
+        found, _ = DBMAdapter.parse_constraints([text], clocks_dict)
+        for clock_index, _op, constant in found:
+            clock = names[clock_index]
+            constants[clock] = max(constants.get(clock, 0), constant)
+    return constants
 
 
 def extend_timed_cgs_clocks(tcgs, formula_clocks: tuple[str, ...]) -> None:

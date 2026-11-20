@@ -12,14 +12,6 @@
         ],
         "./model_checker/algorithms/explicit/ATL/preimage.py": [
             {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 38,
-                    "endColumn": 44,
-                    "lineCount": 1
-                }
-            },
-            {
                 "code": "reportReturnType",
                 "range": {
                     "startColumn": 15,
@@ -34,25 +26,9 @@
                     "endColumn": 51,
                     "lineCount": 1
                 }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 49,
-                    "endColumn": 65,
-                    "lineCount": 1
-                }
             }
         ],
         "./model_checker/algorithms/explicit/ATLF/preimage.py": [
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 49,
-                    "endColumn": 55,
-                    "lineCount": 1
-                }
-            },
             {
                 "code": "reportCallIssue",
                 "range": {
@@ -74,34 +50,6 @@
                 "range": {
                     "startColumn": 58,
                     "endColumn": 67,
-                    "lineCount": 1
-                }
-            }
-        ],
-        "./model_checker/algorithms/explicit/CapATL/solver.py": [
-            {
-                "code": "reportAttributeAccessIssue",
-                "range": {
-                    "startColumn": 17,
-                    "endColumn": 21,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportAttributeAccessIssue",
-                "range": {
-                    "startColumn": 17,
-                    "endColumn": 22,
-                    "lineCount": 1
-                }
-            }
-        ],
-        "./model_checker/algorithms/explicit/CapATL/utils.py": [
-            {
-                "code": "reportGeneralTypeIssues",
-                "range": {
-                    "startColumn": 76,
-                    "endColumn": 84,
                     "lineCount": 1
                 }
             }
@@ -280,22 +228,6 @@
             {
                 "code": "reportArgumentType",
                 "range": {
-                    "startColumn": 8,
-                    "endColumn": 56,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 8,
-                    "endColumn": 56,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
                     "startColumn": 40,
                     "endColumn": 44,
                     "lineCount": 1
@@ -306,16 +238,6 @@
                 "range": {
                     "startColumn": 40,
                     "endColumn": 44,
-                    "lineCount": 1
-                }
-            }
-        ],
-        "./model_checker/algorithms/explicit/IATL/util/validation.py": [
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 8,
-                    "endColumn": 62,
                     "lineCount": 1
                 }
             }
@@ -558,136 +480,12 @@
                 }
             }
         ],
-        "./model_checker/algorithms/explicit/NatATL/Memoryless/solver.py": [
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 16,
-                    "endColumn": 19,
-                    "lineCount": 1
-                }
-            }
-        ],
-        "./model_checker/algorithms/explicit/NatATL/Memoryless/strategies.py": [
-            {
-                "code": "reportReturnType",
-                "range": {
-                    "startColumn": 43,
-                    "endColumn": 62,
-                    "lineCount": 1
-                }
-            }
-        ],
         "./model_checker/algorithms/explicit/NatATL/Recall/natatl_recall.py": [
             {
                 "code": "reportAttributeAccessIssue",
                 "range": {
-                    "startColumn": 27,
-                    "endColumn": 35,
-                    "lineCount": 1
-                }
-            }
-        ],
-        "./model_checker/algorithms/explicit/NatATL/Recall/strategy_generation.py": [
-            {
-                "code": "reportReturnType",
-                "range": {
-                    "startColumn": 8,
-                    "endColumn": 14,
-                    "lineCount": 1
-                }
-            }
-        ],
-        "./model_checker/algorithms/explicit/NatATL/Recall/strategy_initialization.py": [
-            {
-                "code": "reportAttributeAccessIssue",
-                "range": {
                     "startColumn": 25,
-                    "endColumn": 34,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 50,
-                    "endColumn": 68,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 45,
-                    "endColumn": 63,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 8,
-                    "endColumn": 26,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportReturnType",
-                "range": {
-                    "startColumn": 8,
-                    "endColumn": 27,
-                    "lineCount": 1
-                }
-            }
-        ],
-        "./model_checker/algorithms/explicit/NatATL/Recall/tree_building.py": [
-            {
-                "code": "reportAttributeAccessIssue",
-                "range": {
-                    "startColumn": 11,
-                    "endColumn": 30,
-                    "lineCount": 1
-                }
-            }
-        ],
-        "./model_checker/algorithms/explicit/NatATL/Recall/tree_traversal.py": [
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 26,
-                    "endColumn": 43,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportCallIssue",
-                "range": {
-                    "startColumn": 16,
-                    "endColumn": 31,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 16,
-                    "endColumn": 31,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 37,
-                    "endColumn": 40,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 55,
-                    "endColumn": 69,
+                    "endColumn": 33,
                     "lineCount": 1
                 }
             }
@@ -726,50 +524,6 @@
                 }
             }
         ],
-        "./model_checker/algorithms/explicit/TCTL/evaluators.py": [
-            {
-                "code": "reportAttributeAccessIssue",
-                "range": {
-                    "startColumn": 71,
-                    "endColumn": 77,
-                    "lineCount": 1
-                }
-            }
-        ],
-        "./model_checker/algorithms/explicit/TCTL/operators.py": [
-            {
-                "code": "reportAttributeAccessIssue",
-                "range": {
-                    "startColumn": 27,
-                    "endColumn": 31,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportAttributeAccessIssue",
-                "range": {
-                    "startColumn": 27,
-                    "endColumn": 32,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportAttributeAccessIssue",
-                "range": {
-                    "startColumn": 27,
-                    "endColumn": 31,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportAttributeAccessIssue",
-                "range": {
-                    "startColumn": 27,
-                    "endColumn": 32,
-                    "lineCount": 1
-                }
-            }
-        ],
         "./model_checker/algorithms/explicit/TCTL/solver.py": [
             {
                 "code": "reportAttributeAccessIssue",
@@ -784,56 +538,6 @@
                 "range": {
                     "startColumn": 34,
                     "endColumn": 36,
-                    "lineCount": 1
-                }
-            }
-        ],
-        "./model_checker/algorithms/explicit/TOL/operators.py": [
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 44,
-                    "endColumn": 56,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 44,
-                    "endColumn": 56,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 44,
-                    "endColumn": 56,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 44,
-                    "endColumn": 54,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 44,
-                    "endColumn": 54,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 44,
-                    "endColumn": 53,
                     "lineCount": 1
                 }
             }
@@ -868,24 +572,6 @@
                 "range": {
                     "startColumn": 35,
                     "endColumn": 54,
-                    "lineCount": 1
-                }
-            }
-        ],
-        "./model_checker/algorithms/explicit/shared/bounded_atl_preimage.py": [
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 49,
-                    "endColumn": 55,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 49,
-                    "endColumn": 55,
                     "lineCount": 1
                 }
             }
@@ -1016,26 +702,8 @@
             {
                 "code": "reportAttributeAccessIssue",
                 "range": {
-                    "startColumn": 23,
-                    "endColumn": 29,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportAttributeAccessIssue",
-                "range": {
                     "startColumn": 35,
                     "endColumn": 41,
-                    "lineCount": 1
-                }
-            }
-        ],
-        "./model_checker/parsers/game_structures/timed_cgs/semantics.py": [
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 51,
-                    "endColumn": 62,
                     "lineCount": 1
                 }
             }

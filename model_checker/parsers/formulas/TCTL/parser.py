@@ -5,11 +5,8 @@ is dense then, by definition, there is no unique next time" (Alur, Courcoubetis,
 Dill, Information and Computation 1993, p. 10).
 """
 
-import re
-
 from model_checker.parsers.formulas.parser_utils import (
-    _MODAL_TOKEN_PREFIX,
-    _MODAL_TOKEN_SUFFIX,
+    dense_time_next_error,
     normalize_formula_text,
     run_common_prechecks,
     until_operands,
@@ -18,53 +15,17 @@ from model_checker.parsers.formulas.shared_parser import (
     BaseLogicParser,
     quantifier_rules,
 )
-from model_checker.parsers.syntax_patterns import TCTL_TOL_PROPOSITION_TOKEN
-
-# `X` alone is never a TCTL name (a name starts lowercase), so this cannot reject a
-# valid formula; `xray` and `nextstate` stay names.
-_NEXT_OPERATOR = re.compile(
-    _MODAL_TOKEN_PREFIX + r"(?:[AE]\s*)?(?:X|next)" + _MODAL_TOKEN_SUFFIX
+from model_checker.parsers.formulas.timed_ast import (
+    AtomicProp,
+    Binary,
+    BooleanConst,
+    ClockExpr,
+    Expr,
+    FreezeExpr,
+    SimpleTimeExpr,
+    Unary,
 )
-
-
-# --- AST nodes ---
-class Expr:
-    def __init__(self) -> None:
-        self.satisfying_regions: set = set()
-        self.constraints = None
-
-
-class Unary(Expr):
-    def __init__(self, op: str, operand: Expr) -> None:
-        super().__init__()
-        self.op = op
-        self.operand = operand
-
-    def __repr__(self) -> str:
-        return f"{self.op}({self.operand})"
-
-
-class Binary(Expr):
-    def __init__(self, op: str, left: Expr, right: Expr) -> None:
-        super().__init__()
-        self.op = op
-        self.right = right
-        self.left = left
-
-    def __repr__(self) -> str:
-        return f"{self.op} {self.left},{self.right}"
-
-
-class AtomicProp(Expr):
-    def __init__(self, name: str) -> None:
-        super().__init__()
-        self.name = name
-
-    def __repr__(self) -> str:
-        return self.name
-
-    def __str__(self) -> str:
-        return self.name
+from model_checker.parsers.syntax_patterns import TCTL_TOL_PROPOSITION_TOKEN
 
 
 class QuantifiedPath(Expr):
@@ -75,50 +36,6 @@ class QuantifiedPath(Expr):
 
     def __repr__(self) -> str:
         return f"{self.quantifier}({self.formula})"
-
-
-class FreezeExpr(Expr):
-    def __init__(self, clock: str, operand: Expr) -> None:
-        super().__init__()
-        self.clock = clock
-        self.operand = operand
-
-    def __repr__(self) -> str:
-        return f"{self.clock}.({self.operand})"
-
-
-class ClockExpr(Expr):
-    def __init__(self, subject: Expr, constraints: Expr) -> None:
-        super().__init__()
-        self.subject = subject
-        self.constraints = str(constraints)
-
-    def __repr__(self) -> str:
-        return f"{self.subject}: {self.constraints}"
-
-    def __str__(self) -> str:
-        return f"{self.subject}: {self.constraints}"
-
-
-class SimpleTimeExpr(Expr):
-    def __init__(self, constraints: str) -> None:
-        super().__init__()
-        self.constraints = constraints
-
-    def __repr__(self) -> str:
-        return self.constraints
-
-    def __str__(self) -> str:
-        return self.constraints
-
-
-class BooleanConst(Expr):
-    def __init__(self, value: bool) -> None:
-        super().__init__()
-        self.value = value
-
-    def __repr__(self) -> str:
-        return "true" if self.value else "false"
 
 
 class TCTLParser(BaseLogicParser):
@@ -226,14 +143,9 @@ class TCTLParser(BaseLogicParser):
         return super().parse(formula, **kwargs)
 
     def _pre_validation(self, formula) -> tuple[bool, str | None]:
-        next_op = _NEXT_OPERATOR.search(formula)
-        if next_op:
-            return (
-                False,
-                f"TCTL has no next operator ('{next_op.group(0)}' at position "
-                f"{next_op.start() + 1}): time is dense, so there is no unique "
-                "next state",
-            )
+        next_error = dense_time_next_error(formula, "TCTL")
+        if next_error:
+            return False, next_error
         return run_common_prechecks(
             formula,
             allow_hash_at=False,

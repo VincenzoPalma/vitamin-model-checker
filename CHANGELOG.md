@@ -6,20 +6,230 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-18
+
+Fixes for 2.0.0: model loading for CTL, TCTL, OL and TOL, RBATL coalition costs,
+and two `IndexError` crashes. One change can alter results: in LTL, `!p U q` now
+reads as `(!p) U q`; write `!(p U q)` for the negated Until.
+
+### Fixed
+
+- LTL: `!` binds tighter than `U`, as in Spot's precedence table (Spot-tl p. 15)
+  and every other logic of the checker: `!p U q` is `(!p) U q`, no longer
+  `!(p U q)`, and `X !p U q` is `(X !p) U q`. Breaking: a formula that meant
+  the negated Until must now be written `!(p U q)`
+  ([logic knowledge base](docs/reference/logic_knowledge_base.md)).
+- LTL: `model_checking_wins_some_nash` and `model_checking_lose_some_nash` validate
+  `target_agent` again (agent 0 read as the last agent; a number above the agent
+  count raised `IndexError`).
+- LTL: each `!` counts one in a condition's size, so `!p and !q` is 5, not 4
+  ([LTL](docs/algorithms/ltl.md#how-a-check-runs)).
+- RABATL: a `Costs_for_actions_split` row with too few costs is a `model` error
+  naming the action, state and agent (it raised `IndexError` since 2.0.0).
+- RBATL: a coalition move is affordable when one joint action is within the bound,
+  not all, so other agents' costs are not charged to the coalition (PRIMA 2024
+  pp. 5, 9); `<1><5,2> G !p` on `rbatl_2agents_8states_sensor.txt` holds in `s0`
+  again. RABATL is unchanged ([RBATL](docs/algorithms/rbatl.md)).
+- Loader: CTL, TCTL, OL and TOL no longer need a transition for every action
+  combination, as OATL already did; a CTL or OL row such as `0 AC BD` was refused
+  since 2.0.0 ([file formats](docs/reference/file_formats.md)).
+
+## [2.0.0] - 2026-11-17
+
+A major release: formulas and model files follow stricter rules (names start with
+a lowercase letter, reserved words, one action per agent in a joint action, a
+`Wallets` row and a `Clock_constraints` row for every state), and OL, LTL and
+Wallet_ATL follow their papers. Read the "Breaking" entries before upgrading.
+
 ### Added
+
+- CapATL evaluates the knowledge operator `Ka(...)` (AAMAS 2024 Def. 3.2): it holds
+  when every complete capacity assignment agent `a` still considers possible,
+  given the states and its own moves, satisfies the formula inside. Before,
+  checking a formula with `K` returned a `validation` error. On the example model
+  `capatl_3agents_3states_example.txt`, `<{1,2,3}> X K2(3 is cap)` holds in `q1`
+  and `<{1,2}> F (K2(3 is cap) || K2(3 is cop))` in `q0` and `q1`. See
+  [knowledge operator](docs/algorithms/capatl.md#knowledge-operator).
+- CapATL: `a is c` with a capacity the model does not declare is a `semantic`
+  error that names it.
 
 - Model type `fuzzyCGS` (class `FuzzyCGS`) for ATLF: the CGS sections, with
   `Labelling` cells that are numbers between 0 and 1. See
   [fuzzyCGS sections](docs/reference/file_formats.md#fuzzycgs-sections).
+- LTL `model_checking` takes the keyword arguments `k` (strategy size bound,
+  default 5) and `agents` (the coalition, default every agent). Before, both were
+  fixed. A `k` that is not an integer of at least 1, or an invalid coalition, is
+  a validation error that names it. See
+  [LTL algorithm](docs/algorithms/ltl.md#how-a-check-runs).
+- LTL and NatATL reject an empty coalition, a coalition that names an agent twice
+  and an agent number that is not an integer (such as `True` or `1.5`), with a
+  validation error that shows the coalition or the number.
+
+- ICTL accepts `A(p U q)`, `A[p U q]` and the Release forms, as the ICTL papers
+  write them. Before, they were syntax errors.
+- OL, TOL, RBATL, RABATL, CapATL and Wallet_ATL accept a parenthesized Until (and
+  Release or Weak Until where the logic has them) after the prefix, such as
+  `<J2> (p U q)` and `<1><5> (p U q)`. It builds the same tree as `prefix p U q`.
+- Tests for operator spacing, Until forms and connective spelling in every logic,
+  and one that keeps NatSL's "Unsupported goal" error for a connective in a goal.
+- Docs: "Names and keywords" and "Syntax cards" in `logic_knowledge_base.md` are
+  the one source for names, reserved words and each logic's syntax.
+  `test_names_doc.py` checks them against the parsers.
+- Docs: removed wrong examples and lists: `F`, `G` and `exists` as reserved words,
+  `EF [p]` (CTL), `Ex : (x, 1) F goal` (NatSL), and `>`, `&`, `|` as ICTL
+  connectives.
 
 ### Changed
 
+- Breaking: TCTL `A` and `E` range over time-divergent paths only (Baier and
+  Katoen, Def. 9.30, p. 701). A zero-time loop is no longer a path, and where
+  time stops for good (a timelock) every `A` formula holds and every `E` formula
+  fails. On `tctl_tol_minimal.txt`, `AF false`
+  holds at `s0` and `EF p` fails there; on `tctl_zeno_cycle.txt`, `EG p` is
+  false. TCTL graphs have more regions: 7 to 62 on the test models, against 4
+  to 42. See [Time-divergent paths](docs/algorithms/tctl.md#time-divergent-paths).
+- Breaking: TCTL `A(phi U psi)` is computed as `!(E(!psi U (!phi && !psi)) || EG !psi)`.
+  Before, it held only where `psi` held: on `tol_cost_2states.txt`,
+  `A (true U p)` gave `{s1}` while `AF p` gave `{s0, s1}`.
+- Breaking: TOL lets a path stay where it is: every region has a time step of
+  delay 0 to itself (AAMAS 2025, p. 4), so the Demon must keep that region inside
+  the target too. Before, the last region before an invariant bound had no time
+  step at all and counted for `{Jn} F` and `{Jn} U` as if every path from it
+  reached the goal. On `tol_cost_2states.txt`, `{J2} F p` and `{J2} q U p` drop
+  from `{s0, s1}` to `{s1}`: time may stand still at `s0`. Known limitation:
+  since a path may stay in its region forever, `{Jn} F phi` gives exactly the
+  regions of `phi` and `{Jn} (phi U psi)` those of `psi`, on every model. The
+  paper's Algorithm 2 and Proposition 1 (p. 5) give the same result, its Theorem 2
+  (p. 6) does not, and TOL keeps it. See
+  [Obstruction step](docs/algorithms/tol.md#obstruction-step).
+- Breaking: an error found while reading a model file (not UTF-8, or a format
+  rule broken) has type `model` in every logic. Before, most came back as
+  `system` (for example an ICTL or IATL preorder that is not reflexive, or rows
+  of different lengths), a few as `semantic` (a proposition name such as `A` in
+  `Atomic_propositions`) and, in NatSL, all as `validation`.
+- Breaking: CapATL rejects a `Capacities_assignment` cell other than `0` or `1`,
+  with an error that names it. Before, a value such as `2` loaded and was read
+  as `0`.
+- Breaking: RBATL and RABATL reject a bound with more values than the model's
+  cost vectors, with a `validation` error that names the bound. Before, the extra
+  values were ignored: `<1,2><3,1,5>F p` on a model with two resources gave the
+  answer of `<1,2><3,1>F p`.
+- Breaking: RBATL and RABATL keep a coalition move in the bounded pre-image only
+  when every joint action that contains it lands in the target and costs at most
+  the bound, as `Pre(C, X, b)` of Catta et al. (PRIMA 2024, p. 9) asks. Before,
+  one joint action within the bound was enough and the other agents' choices
+  were not checked. On `rbatl_3agents_medium_6states_costs.txt` for RABATL,
+  `<1,2><0,0>F r` shrinks from `{s1, s2, s3, s4}` to `{s1, s3, s4}`: at `s2` the
+  move `AA` has the completion `AA^` of cost 2. See
+  [Bounded pre-image](docs/algorithms/rbatl.md#bounded-pre-image).
+- NatATL (memoryless and recall): a bound `k` below the number of coalition
+  members gives `Result: False`, since no profile of that size exists. Before,
+  it was a validation error. See [Strategies](docs/algorithms/natatl.md#strategies).
+- Breaking: the loader rejects a model where a state has no transition for some
+  combination of the agents' available actions (the actions each agent plays in
+  the state's row). The message names the state and up to three missing
+  combinations. Before, a combination with no cell was treated as not available:
+  in a row that lists only `AC` (to a `g` state) and `BD` (to a `!g` state), both
+  `<1>X g` and `<2>X !g` held. OATL models and IATL (BCGS) models are exempt,
+  because their papers make the transition function partial. NatSL reports the
+  error at load time instead of its own "Non-total local joint-action table"
+  message. See [Transition](docs/reference/file_formats.md#transition).
+- NatATL and NatATLF report a formula error without the prefix "Invalid NatATL
+  formula format:", as NatATL_Recall does: `<{1}, 1>F` gives "Invalid NatATL
+  formula: Syntax error at end of input". The error type stays `syntax`.
+- Test fixtures gained the missing combinations: the RBATL sensor fixture has the
+  idle self-loops and `CC` of PRIMA 2024 Fig. 1, and in the three-agent RBATL and
+  RABATL fixtures the added combinations keep the state at cost 0, so
+  `<1><2>F r` gives `s1, s3, s4` (before `s0` to `s4`).
+- Breaking: CapATL follows AAMAS 2024 (Def. 2.5, 2.9, 3.2). The coalition keeps
+  one capacity per member for the whole strategy and does not see the opponents'
+  moves; each opponent may play any of its capacities, one per play. Before, the
+  checker picked one capacity for every agent, opponents included, and returned a
+  state if one such choice won, and a `*` in a transition label matched no action
+  of a coalition member. On the example model `capatl_3agents_3states_example.txt`,
+  `<{1,2}>X g` gives `q0, q2` (before `q1`), `<{1,2,3}>X g` gives `q0, q1, q2`
+  (before `q1`), `<{3}>X g` gives `q2` (before none), `<{1,2}>F g` gives
+  `q0, q1, q2` (before `q1, q2`) and `<{1,2}>G a` gives `q0, q1, q2` (before none).
+  The capCGS loader rejects a model whose `Capacities_assignment` does not have one
+  row per agent and one column per capacity, where an agent has no capacity, or
+  where an assigned capacity has no line in `Actions_for_capacities`. See
+  [CapATL algorithm](docs/algorithms/capatl.md).
+- Breaking: NatATL_Recall follows natural strategies with recall of AIJ 2019
+  (section 6.1, p. 21). A rule's condition is a pattern over the history (the
+  states visited so far). A plain condition `p` matches only the one-state history
+  of a `p` state; `true* . p` matches every history ending in a `p` state, at the
+  same size. Every rule list ends in `(true*, IDLE)`, which counts 1, and `k`
+  bounds the sum over the coalition, as for NatATL; before, each member's list had
+  size exactly `i` for `i = 1, ..., k`. Goals more than four steps away are found
+  (the search was cut at depth 4), and a pattern applies on every history it
+  matches (before, on one). See [Recall](docs/algorithms/natatl.md#recall).
+- Breaking: TCTL and TOL work on the
+  [region graph](docs/algorithms/tctl.md#region-graph) of IC 1993 (p. 20): each
+  node is a location and a clock region, and regions never overlap. A clock
+  constraint such as `x<=3` holds in a region only when it holds for every clock
+  value there. Before, the nodes were zones (sets of clock values given by
+  bounds), a constraint held in a zone if one clock value met it, and
+  `AG (p : x<=3)` held on a location whose invariant lets time run to `x=10`.
+  - A time step leads only to the next clock region. Before, it could skip the
+    regions between, and `E (x<=3 U x>=5)` held where time runs through `3<x<5`.
+  - The graph grows with the clock constants (the largest number each clock is
+    compared with) and the number of clocks: the test models have 4 to 42
+    regions, where they had 2 to 6 zones.
+  - The pre-image of TCTL and TOL no longer keeps only regions that meet the
+    operand's guard, so `EF (p : x>5)` and `AG !(p : x>5)` no longer both hold.
+  - TOL works on regions of the region graph instead of locations. The Demon (the
+    player that disables edges at a cost) cannot disable a time step, an edge
+    counts only if it can be taken from the region, and the Demon may not disable
+    every edge of a location. See
+    [obstruction step](docs/algorithms/tol.md#obstruction-step).
+  - TOL `res` lists only locations the region graph reaches, as TCTL does.
+  - A freeze `j.phi` holds in a region when `phi` holds in the region reached by
+    resetting `j` to 0 there (AAMAS 2025 Def. 11, p. 4; IC 1993 p. 22). TCTL and
+    TOL used to evaluate `j.phi` as `phi` in effect, following AAMAS 2025
+    Algorithm 1 (line 19, p. 5), which contradicts that paper's Def. 11, so a
+    freeze under a temporal operator was wrong: on `tctl_invariant10_exit.txt`,
+    `EF (x>8 && j.EF (p && j>=2))` held although time cannot advance by 2 at `s0`
+    after `x>8`. `res` lists only locations of regions that
+    time and edge steps reach from the start, not ones only a freeze reset leads
+    to. See [TCTL overview](docs/algorithms/tctl.md#overview).
+- Breaking: TCTL and TOL reject a freeze on a clock the model declares, such as
+  `x.EF (x>=2)` with the model clock `x`, with a `semantic` error that names the
+  clock (AAMAS 2025 Def. 10, p. 4, keeps the model's clocks and the formula's
+  apart). Before, the freeze reset the model clock.
+- Breaking: TOL rejects `X` and `next` (AAMAS 2025, p. 4, has no next operator).
+- Breaking: NatATL (memoryless) and NatATLF use the natural strategies of AIJ 2019
+  (section 4.1). See [NatATL strategies](docs/algorithms/natatl.md#strategies).
+  - A strategy ends with a `(true, action)` rule, and each rule's action must be
+    available wherever that rule is the first to hold.
+  - A member plays exactly its rule's action. Before, it could also idle, and it
+    idled in states no rule covered.
+  - Conditions are any Boolean formula with `!`, `&&` and `||`. Rules may share an
+    action, and their order matters.
+  - `k` bounds the total size of the coalition's profile, `true` rules included; a
+    `k` below the coalition size is a validation error. Before, each member's
+    strategy had size exactly `i` at step `i`. `Complexity Bound` is the total
+    size of the profile found.
+  - A profile that leaves a state with no move is skipped.
+  - The same `k` can give a different answer: `<{1}, 1>F p` on a model whose two
+    states offer different actions is now false.
+- Breaking: RBATL and RABATL bound the summed cost of the coalition's moves
+  along a path, per resource, as PRIMA 2024 defines it (Def. 4). Before, the bound
+  applied to each step on its own: on the chain test model `<1><1>F p` held at
+  `s0`, although `p` is two steps of cost 1 away. `<1><b>G p` with `b > 0` holds
+  only where `p` can be kept forever within the total. The Until also holds where
+  `psi` holds and `phi` does not. A bound that needs more than 100000 budgets (the
+  product of `b_i + 1`) is a validation error. See
+  [RBATL operators](docs/algorithms/rbatl.md#operators).
 - ATLF reads its model as `fuzzyCGS`, so labels such as `0.7` are accepted. The
   CGS loader accepts only 0 and 1, so before this change ATLF gave the same
   answers as ATL. Other logics still read a CGS. Benchmarks still generate CGS
   models for ATLF.
 - Docs: algorithm, reference and guide pages, README and AIUSE are checked
   against the code and the papers, and their wrong statements are fixed.
+- Docs: the [knowledge base](docs/reference/logic_knowledge_base.md#atl-star)
+  gives the sources for reading ATL* `<<A>> p U q` as `<<A>> (p U q)`; no paper
+  states this reading. A test checks the Until fixpoint law (FPU) written without
+  parentheses.
 - `birelational_matrix` is a package with an `__init__.py` exporting
   `BirelationalMatrix`, so it has an API page.
 - RBATL and RABATL accept a bound of 0 (`<1><0,5>F p`): that resource then allows
@@ -42,37 +252,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   require the section. A logic opts out through `"initial_state_required": False`
   in the `METADATA` of its formula package
   (`model_checker/parsers/formulas/OL/__init__.py`).
-
-### Fixed
-
-- ATLF rounds `1 - x` to 12 decimals: `!p` with `p = 0.7` is `0.3`, not
-  `0.30000000000000004`. Every value in its result is a float, so a state at 0
-  prints `0.0`, not `0`.
-
-## [2.0.0] - 2026-11-12
-
-A major release: formulas and model files follow stricter rules (names start with
-a lowercase letter, reserved words, one action per agent in a joint action, a
-`Wallets` row and a `Clock_constraints` row for every state), and OL, LTL and
-Wallet_ATL follow their papers. Read the "Breaking" entries before upgrading.
-
-### Added
-
-- ICTL accepts `A(p U q)`, `A[p U q]` and the Release forms, as the ICTL papers
-  write them. Before, they were syntax errors.
-- OL, TOL, RBATL, RABATL, CapATL and Wallet_ATL accept a parenthesized Until (and
-  Release or Weak Until where the logic has them) after the prefix, such as
-  `<J2> (p U q)` and `<1><5> (p U q)`. It builds the same tree as `prefix p U q`.
-- Tests for operator spacing, Until forms and connective spelling in every logic,
-  and one that keeps NatSL's "Unsupported goal" error for a connective in a goal.
-- Docs: "Names and keywords" and "Syntax cards" in `logic_knowledge_base.md` are
-  the one source for names, reserved words and each logic's syntax.
-  `test_names_doc.py` checks them against the parsers.
-- Docs: removed wrong examples and lists: `F`, `G` and `exists` as reserved words,
-  `EF [p]` (CTL), `Ex : (x, 1) F goal` (NatSL), and `>`, `&`, `|` as ICTL
-  connectives.
-
-### Changed
+- Breaking, compared with the original VITAMIN repository (commit e8ea8773).
+  Formulas or models written for that code can give other results in these
+  cases:
+  - Connectives have a precedence, `!` before `&&` before `||` before `->`, and
+    `->` groups to the right. The original parsers had no precedence table and
+    grouped to the right of each connective: `!p && q` was `!(p && q)`, `!p || q`
+    was `!(p || q)`, `p && q || r` was `p && (q || r)` and `p && q -> r` was
+    `p && (q -> r)`. They now read `(!p) && q`, `(!p) || q`, `(p && q) || r` and
+    `(p && q) -> r`. See
+    [Boolean logic](docs/reference/logic_knowledge_base.md#boolean-logic-shared-syntax).
+  - A state with no successor (a `Transition` row of only `0`) is a load error
+    ("Model structure validation failed: ...") that names the state and suggests a `*` self-loop. The original loaded such a
+    model, and its CTL and ATL read the state in different ways. In CTL, `AX phi`
+    held there whatever `phi` was, `EX phi` and `EG phi` failed, `AG phi` and
+    `EF phi` held exactly where `phi` did, and `AF phi` was computed as `AG phi`.
+    In ATL, every `<A>X phi` failed there, so `<1>X q` and `<2>X !q` both failed
+    at the same state. See
+    [CGS sections](docs/reference/file_formats.md#cgs-sections).
+  - NatATL, NatATLF, LTL and SolutionConcepts can build a strategy rule whose
+    action is idle (`I`), as AIJ 2019 does (p. 13). The original left `I` out of
+    the actions it built rules from, so a check of a coalition with bound `k` can
+    change from false to true. Example: two agents and three states; `s0` moves
+    to `s1` on `II`; `s1` stays on `II` and moves to `s2`, where `r` holds, on
+    `bI`; `s2` loops on `II`. LTL `G !r` with `k = 1` holds at `s0`, because
+    agent 1 can idle in `s1`; the original gave false.
+- Docs: [NatATLF](docs/algorithms/natatlf.md#relation-to-humanatlf) is NatATL on
+  labels 0 and 1. It is not HumanATL[F] of AAAI 2026, whose code is in
+  HumanATLFTool.
+  [NatSL](docs/algorithms/natsl.md#fragment-covered) covers the one-goal,
+  non-alternating fragment of SPIRIT 2024 (p. 5).
+  [Wallet_ATL](docs/algorithms/wallet_atl.md#two-readings-of-the-guard-in-the-paper)
+  gives the paper's two readings of where a guard holds (Def. 4.5 and
+  Algorithm 1) and an example where they differ. The knowledge base says that
+  `->` groups to the right, as in NuSMV and Spot, and why a Wallet_ATL guard must
+  name a coalition agent. OL and the file formats page say how a `*` cell of
+  `Transition` gets its cost.
 
 - Docs: pages are grouped under `docs/algorithms/` (one page per logic plus
   `index.md`), `docs/reference/`, `docs/guides/` and `docs/examples/`. The old
@@ -143,8 +358,9 @@ Wallet_ATL follow their papers. Read the "Breaking" entries before upgrading.
 - Breaking: CTL takes square brackets only around an Until, `A[p U q]`, as Clarke,
   Emerson and Sistla (1986, p. 246) write it. Before, `[p] && q` and `AF [p]`
   parsed with the brackets as parentheses.
-- Breaking: ATL* reads `<<1>> p U q` as `<<1>> (p U q)`, as the ATL paper does
-  (JACM 2002, p. 689). A chained `U` (`p U q U r`), a `U` next to `&&`, `||` or
+- Breaking: ATL* reads `<<1>> p U q` as `<<1>> (p U q)`, as ATL writes its Until
+  (JACM 2002, pp. 685, 689; no paper states the reading, see the
+  [knowledge base](docs/reference/logic_knowledge_base.md#atl-star)). A chained `U` (`p U q U r`), a `U` next to `&&`, `||` or
   `->` (`<<1>> (p U q && r)`) and any connective after a coalition
   (`<<1>> p && q`) are syntax errors asking for parentheses. Before,
   `<<1>> p U q` parsed as `(<<1>> p) U q` and failed with "a bare Until is not a
@@ -216,6 +432,36 @@ Wallet_ATL follow their papers. Read the "Breaking" entries before upgrading.
   lacks. CTL trace tests check the trace type and that the path follows real edges.
 
 ### Fixed
+
+- CTL, TCTL, TOL and ATL* read a `*` cell of `Transition` as a transition to the
+  cell's column, as ATL and the [file format](docs/reference/file_formats.md#transition)
+  do. Before, they read a `*` off the diagonal as a self-loop on the row's state.
+  On the Workbench model `ctl_train_controller_1agent_8states.txt`, whose `s7` row
+  has `*` towards `sI`, `AG hazard` held at `s7` and holds at no state.
+- ICTL reads a `*` cell off the diagonal as an `R` transition to the cell's
+  column, as CTL, TCTL, TOL and ATL* do. Before, it was a self-loop on the row
+  state, so in a model whose only move from `s0` to `s1` is a `*`, `EX p` with
+  `p` at `s1` missed `s0`.
+- ICTL rejects a `Transition` cell other than `0`, `R`, `P`, `P,R` and `*`, with
+  an error that names it. Before, a cell such as `Q` loaded and counted as a
+  transition for the checker but not for the serial and confluence checks.
+- NatATL_Recall accepts a rule whose action is idle: it compared the model's `I`
+  with the rule's `IDLE` and never matched, and it treated the tree's cut-off leaves
+  as states with no action, so every rule failed (`<{1},1>G !r` was false on a model
+  where idling keeps away from `r`). It reads a member's action at its agent
+  number, not at its position in the coalition, and tries strategies in a fixed
+  order. See [Recall](docs/algorithms/natatl.md#recall).
+- NatATL_Recall accepts a model whose first state has only a self-loop while
+  another state has transitions. It rejected such a model with "Configuration
+  error: State 's0' has no transitions to other states", a limit of the tree it
+  used to build from `s0`; histories start in any state.
+- LTL conditions can negate any atom (`p and !q`); before, `!` could only stand on
+  the first atom. The condition generator also uses every connective it is given
+  instead of the first one; LTL still passes `and` only. See
+  [LTL algorithm](docs/algorithms/ltl.md#how-a-check-runs).
+- ATLF rounds `1 - x` to 12 decimals: `!p` with `p = 0.7` is `0.3`, not
+  `0.30000000000000004`. Every value in its result is a float, so a state at 0
+  prints `0.0`, not `0`.
 
 - Every logic that answers with a state set prints `res` as a tuple in natural
   order, numbers inside a name compared as numbers: `Result: ('s1', 's2', 's10')`.
@@ -421,6 +667,11 @@ Wallet_ATL follow their papers. Read the "Breaking" entries before upgrading.
   TimedCGS model follows the same rule.
 
 ### Removed
+
+- `ZoneGraph.has_path_from`, `ZoneGraph.find_path_from`,
+  `DBMAdapter.compute_predecessors` and the backward path helpers
+  `any_backward_path` and `collect_backward_paths` of `trace_utils`. No checker
+  called them: TCTL and TOL build the region graph forward.
 
 - Breaking: `read_from_model_object` of CGS, CapCGS and CostCGS (and the
   ObstructionModel stub). Nothing called it, and it skipped the checks of

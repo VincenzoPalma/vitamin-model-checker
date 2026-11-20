@@ -1,74 +1,62 @@
-"""Strategy enumeration and pruning loop for NatATL memoryless verification."""
+"""Strategy search for NatATL memoryless verification: natural strategy profiles of
+the coalition, smallest total size first, each checked on the model it prunes."""
 
+import copy
 import logging
 from typing import Any
 
-from model_checker.algorithms.explicit.NatATL.Memoryless.pruning import (
-    pruning,
-)
-from model_checker.algorithms.explicit.shared.strategies_base import (
-    generate_guarded_action_pairs,
-    generate_strategies,
+from model_checker.algorithms.explicit.shared.natural_strategies import (
+    agent_strategies,
+    available_actions,
+    enumerate_conditions,
+    goal_holds_on,
+    parse_rows,
+    restrict_to_profile,
+    smallest_winning_profile,
 )
 from model_checker.parsers.game_structures.cgs import CGSProtocol
 
 logger = logging.getLogger(__name__)
 
 
+def _profile_wins(cgs, parsed_rows, agents, profile, ctl_formula, model_path) -> bool:
+    """True when the CTL goal holds at the initial state of the model pruned to the
+    coalition's profile."""
+    # CTL only reads the model, and its edge caches are keyed by the graph object.
+    pruned = copy.copy(cgs)
+    pruned.graph = restrict_to_profile(cgs.states, parsed_rows, agents, profile)
+    return goal_holds_on(pruned, ctl_formula, model_path)
+
+
 def solve_natatl_memoryless(
     k: int,
-    agent_actions: dict[str, list[str]],
-    actions_list: list[list[str]],
-    atomic_propositions: list[str],
-    CTLformula: str,
+    ctl_formula: str,
     agents: list[int],
     cgs: CGSProtocol,
     model_path: str,
 ) -> dict[str, Any]:
-    """Search strategies up to complexity k; return the first one that passes pruning."""
-    found_solution = False
-    result: dict[str, Any] = {}
-
-    i = 1
+    """Whether the coalition has a natural strategy profile of total size at most k
+    that enforces the goal, with the smallest such profile."""
+    # Every other member needs at least its true rule, so one condition is at most
+    # k - len(agents) symbols; with k below the coalition size no profile exists.
+    conditions = enumerate_conditions(cgs, k - len(agents))
+    parsed_rows = parse_rows(cgs)
+    per_agent = [
+        agent_strategies(
+            conditions,
+            available_actions(cgs.states, parsed_rows, agent),
+            k - len(agents) + 1,
+        )
+        for agent in agents
+    ]
     logger.info("Starting NatATL Memoryless verification (Bound k=%d)", k)
 
-    while not found_solution and i <= k:
-        logger.debug("Checking strategies at complexity level %d", i)
-
-        # Generate guarded action pairs for each agent
-        cartesian_products = generate_guarded_action_pairs(
-            i, agent_actions, actions_list, atomic_propositions
-        )
-
-        # Generate strategies for this complexity level
-        strategies_generator = generate_strategies(
-            cartesian_products, i, agents, found_solution
-        )
-
-        # Check each strategy via pruning & model checking
-        for current_strategy in strategies_generator:
-            found_solution = pruning(
-                cgs, model_path, agents, CTLformula, current_strategy
-            )
-
-            if found_solution:
-                logger.info("Solution found with strategy: %s", current_strategy)
-                result["Satisfiability"] = True
-                result["Complexity Bound"] = i
-                result["Winning Strategy per agent"] = current_strategy
-                break
-
-        i += 1
-
-    if not found_solution:
-        logger.info("No solution found after checking bound k=%d", k)
-        result["Satisfiability"] = False
-        result["Complexity Bound"] = k
-
-    # Add standard result fields for backend compatibility
-    initial_state = cgs.initial_state if hasattr(cgs, "initial_state") else "s0"
-    is_sat = result.get("Satisfiability", False)
-    result["res"] = f"Result: {is_sat}"
-    result["initial_state"] = f"Initial state {initial_state}: {is_sat}"
-
-    return result
+    return smallest_winning_profile(
+        per_agent,
+        k,
+        lambda profile: _profile_wins(
+            cgs, parsed_rows, agents, profile, ctl_formula, model_path
+        ),
+        lambda strategy: list(strategy.rules),
+        cgs.initial_state,
+    )

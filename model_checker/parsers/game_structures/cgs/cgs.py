@@ -13,6 +13,7 @@ from model_checker.parsers.game_structures.cgs import (
     cgs_validation,
 )
 from model_checker.parsers.syntax_patterns import FORMULA_RESERVED_WORDS
+from model_checker.utils.error_handler import as_model_error
 
 
 class CGS:
@@ -21,6 +22,10 @@ class CGS:
     # Words a name in the model file may not be; a model type read by one logic
     # only uses that logic's words (CapCGS: CapATL).
     RESERVED_WORDS = FORMULA_RESERVED_WORDS
+
+    # Whether a state may lack a transition for some combination of available
+    # actions; a model type or the logic (create_model_parser_for_logic) allows it.
+    partial_transitions_allowed = False
 
     def validate_name(self, name: str, kind: str) -> None:
         """Reject a proposition or capacity name that no formula could reference."""
@@ -57,10 +62,15 @@ class CGS:
 
     def read_file(self, filename):
         """Load and parse a CGS model from a file path. Replaces any existing data."""
-        with open(filename, encoding="utf-8") as f:
-            lines = f.readlines()
-        self._parse_lines(lines)
-        self.validate_model_structure()
+        # A file that is not UTF-8 or breaks a format rule is a model error, not a
+        # system one; a missing file stays FileNotFoundError.
+        try:
+            with open(filename, encoding="utf-8") as f:
+                lines = f.readlines()
+            self._parse_lines(lines)
+            self.validate_model_structure()
+        except (ValueError, AssertionError) as exc:
+            raise ValueError(as_model_error(exc)) from exc
 
     def _parse_lines(self, lines: list[str]) -> None:
         """Parse lines from a model file. Override in subclasses for extra sections."""

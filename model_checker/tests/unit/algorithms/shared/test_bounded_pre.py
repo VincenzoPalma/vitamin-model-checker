@@ -22,8 +22,8 @@ _MODEL = (
 def _pre(temp_file, header, costs, coalition, bound, cost_filter):
     model = CostCGS()
     model.read_file(temp_file(_MODEL.format(header=header, costs=costs)))
-    cache = build_transition_cache(model, coalition)
-    return compute_pre_states(model, coalition, {"s1"}, bound, cache, cost_filter)
+    cache = build_transition_cache(model, coalition, cost_filter)
+    return compute_pre_states(model, {"s1"}, bound, cache)
 
 
 @pytest.mark.unit
@@ -54,12 +54,41 @@ def test_rabatl_counts_only_the_coalition_cost(temp_file, coalition, bound, pre)
 
 
 @pytest.mark.unit
+def test_rabatl_row_without_a_member_cost_is_a_model_error(temp_file):
+    """`AC s0$1` has no cost for agent 2: a named error, not an IndexError."""
+    costs = "AC s0$1\nBC s0$1,1\n** s1$0,0;s2$0,0"
+    with pytest.raises(ValueError, match=r"\[MODEL\].*action A\|C at s0.*agent 2"):
+        _pre(temp_file, "Costs_for_actions_split", costs, "1,2", [10], "rabatl")
+    assert _pre(temp_file, "Costs_for_actions_split", costs, "1", [10], "rabatl") == {
+        "s0",
+        "s1",
+    }
+
+
+@pytest.mark.unit
 def test_rabatl_coalition_whose_move_the_opponent_can_divert(temp_file):
     """Agent 2 plays C in both AC and BC, so agent 1 can escape to s2 whatever the budget."""
     costs = "AC s0$1,9\nBC s0$1,1\n** s1$0,0;s2$0,0"
     assert _pre(temp_file, "Costs_for_actions_split", costs, "2", [100], "rabatl") == {
         "s1"
     }
+
+
+@pytest.mark.unit
+def test_rbatl_does_not_charge_the_coalition_for_the_others_action(temp_file):
+    """Agent 1's move A reaches s1 whatever agent 2 plays; AD costs 9 only because
+    agent 2 plays D, so A costs the 1 of its cheapest joint action AC."""
+    model = CostCGS()
+    model.read_file(
+        temp_file(
+            "Transition\n0 AC,AD 0\n0 ** 0\n0 0 **\nName_State\ns0 s1 s2\nInitial_State\ns0\n"
+            "Costs_for_actions\nAC s0$1\nAD s0$9\n** s1$0;s2$0\n"
+            "Atomic_propositions\np\nLabelling\n0\n1\n0\nNumber_of_agents\n2\n"
+        )
+    )
+    cache = build_transition_cache(model, "1", "rbatl")
+    assert compute_pre_states(model, {"s1"}, [1], cache) == {"s0", "s1"}
+    assert compute_pre_states(model, {"s1"}, [0], cache) == {"s1"}
 
 
 @pytest.mark.unit
@@ -73,13 +102,9 @@ def test_wildcard_cell_to_two_states_does_not_force_either(temp_file):
             "Number_of_agents\n2\n"
         )
     )
-    cache = build_transition_cache(model, "1")
-    assert compute_pre_states(model, "1", {"s1"}, [5], cache, "rbatl") == {"s1"}
-    assert compute_pre_states(model, "1", {"s1", "s2"}, [5], cache, "rbatl") == {
-        "s0",
-        "s1",
-        "s2",
-    }
+    cache = build_transition_cache(model, "1", "rbatl")
+    assert compute_pre_states(model, {"s1"}, [5], cache) == {"s1"}
+    assert compute_pre_states(model, {"s1", "s2"}, [5], cache) == {"s0", "s1", "s2"}
 
 
 @pytest.mark.unit
@@ -87,17 +112,18 @@ def test_wildcard_cell_to_two_states_does_not_force_either(temp_file):
 def test_move_that_also_reaches_a_state_outside_the_target_does_not_force(
     test_data_dir, cost_filter
 ):
-    """In the medium fixtures A|A|^ from s0 reaches s1 and s3, so only {s1, s3} is forced."""
+    """In the medium fixtures agent 1's move A from s0 reaches s0, s1 and s3, so it
+    forces {s0, s1, s3} but not {s0, s1}."""
     from model_checker.tests.helpers.model_helpers import load_test_model
 
     logic = cost_filter.upper()
     cgs = load_test_model(
         test_data_dir, f"costCGS/{logic}/{cost_filter}_3agents_medium_6states_costs.txt"
     )
-    cache = build_transition_cache(cgs, "1")
+    cache = build_transition_cache(cgs, "1", cost_filter)
     bound = [100, 100, 100]
-    assert compute_pre_states(cgs, "1", {"s1"}, bound, cache, cost_filter) == {"s1"}
-    assert compute_pre_states(cgs, "1", {"s1", "s3"}, bound, cache, cost_filter) == {
+    assert compute_pre_states(cgs, {"s0", "s1"}, bound, cache) == {"s1"}
+    assert compute_pre_states(cgs, {"s0", "s1", "s3"}, bound, cache) == {
         "s0",
         "s1",
         "s3",

@@ -3,18 +3,31 @@
 Extract actions from the transition matrix, format coalition/opponent moves.
 """
 
+from collections.abc import Iterable
+
 
 def validate_agent_numbers(agents: list[int], num_agents: int):
-    """Check that every agent number is between 1 and num_agents. Raises ValueError if not."""
+    """Check that the coalition is non-empty, names each agent once and only numbers
+    between 1 and num_agents. Raises a [VALIDATION] ValueError if not."""
+    if not agents:
+        raise ValueError(f"[VALIDATION] Coalition {agents!r} names no agent.")
+    if len(set(agents)) != len(agents):
+        raise ValueError(f"[VALIDATION] Coalition {agents!r} names an agent twice.")
     for agent in agents:
-        if not isinstance(agent, int) or agent < 1 or agent > num_agents:
+        # bool is a subclass of int, so True would pass as agent 1.
+        if isinstance(agent, bool) or not isinstance(agent, int):
             raise ValueError(
-                f"Invalid agent number: {agent}. "
+                f"[VALIDATION] Invalid agent number: {agent!r}. "
+                "Agent numbers are integers."
+            )
+        if agent < 1 or agent > num_agents:
+            raise ValueError(
+                f"[VALIDATION] Invalid agent number: {agent}. "
                 f"Agent numbers must be between 1 and {num_agents} (inclusive)."
             )
 
 
-def format_agents(agents: list[int]) -> set[int]:
+def format_agents(agents: Iterable[int | str]) -> set[int]:
     """Drop 0 from the list and convert 1-based agent numbers to 0-based indices."""
     return {int(x) - 1 for x in agents if x != 0}
 

@@ -5,7 +5,10 @@ import pytest
 from model_checker.algorithms.explicit.LTL.LTL import (
     model_checking,
     model_checking_exists_nash,
+    model_checking_lose_some_nash,
+    model_checking_wins_some_nash,
 )
+from model_checker.parsers.game_structures.cgs import CGS
 from model_checker.tests.helpers.model_helpers import generate_linear_chain
 
 
@@ -112,6 +115,60 @@ class TestLTLSemantics:
     ):
         """A formula that holds in no state makes `F` of it false."""
         self._assert_verdict(model_checking(formula, ltl_minimal_model.filename), holds)
+
+
+_ONLY_AGENT_1_CHOOSES = (
+    "Transition\n0 AI BI\n0 II 0\n0 0 II\n"
+    "Name_State\ns0 s1 s2\nInitial_State\ns0\nAtomic_propositions\ngoal\n"
+    "Labelling\n0\n1\n0\nNumber_of_agents\n2\n"
+)
+
+
+@pytest.mark.integration
+@pytest.mark.model_checking
+@pytest.mark.semantic
+@pytest.mark.parametrize(("agents", "holds"), [([1], True), ([2], False), (None, True)])
+def test_the_coalition_decides_sure_win(temp_file, agents, holds):
+    """At s0 agent 1 picks goal (A) or the sink s2 (B); agent 2 only idles."""
+    result = model_checking("F goal", temp_file(_ONLY_AGENT_1_CHOOSES), agents=agents)
+    assert result["res"] == f"Result: {holds}"
+
+
+@pytest.mark.integration
+@pytest.mark.model_checking
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        ({"k": 0}, "k must be an integer >= 1, got 0"),
+        ({"agents": []}, "Coalition [] names no agent"),
+        ({"agents": [1, 1]}, "Coalition [1, 1] names an agent twice"),
+        ({"agents": [True]}, "Invalid agent number: True"),
+        ({"agents": [3]}, "Invalid agent number: 3"),
+    ],
+)
+def test_invalid_k_or_coalition_is_named(temp_file, options, message):
+    """A bad bound or coalition is an error that names it, never a silent default."""
+    result = model_checking("F goal", temp_file(_ONLY_AGENT_1_CHOOSES), **options)
+    assert result["error"]["type"] == "validation"
+    assert message in result["error"]["message"]
+
+
+@pytest.mark.integration
+@pytest.mark.model_checking
+@pytest.mark.parametrize(
+    "check", [model_checking_wins_some_nash, model_checking_lose_some_nash]
+)
+@pytest.mark.parametrize(
+    ("target", "message"),
+    [(0, "Invalid agent number: 0"), (3, "Invalid agent number: 3")],
+)
+def test_nash_target_agent_is_validated(temp_file, check, target, message):
+    """Agent 0 is not the last agent and 3 is no agent of a 2-agent model."""
+    path = temp_file(_ONLY_AGENT_1_CHOOSES)
+    cgs = CGS()
+    cgs.read_file(path)
+    with pytest.raises(ValueError, match=message):
+        check(cgs, path, [1, 2], "AF goal", [], 2, {}, ["goal"], target)
 
 
 @pytest.mark.integration

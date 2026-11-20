@@ -6,8 +6,10 @@ import numpy as np
 
 from model_checker.algorithms.explicit.shared.graph_relations import labeled_pairs
 
-_PREORDER_CELLS = frozenset({"P", "P,R"})
-_TRANSITION_CELLS = frozenset({"R", "P,R"})
+PREORDER_CELLS = frozenset({"P", "P,R"})
+# A star, like R, is a transition to the cell's column.
+TRANSITION_CELLS = frozenset({"R", "P,R", "*"})
+_KNOWN_CELLS = PREORDER_CELLS | TRANSITION_CELLS | {0, "0"}
 
 
 def _check_c1(graph: np.ndarray) -> bool:
@@ -16,14 +18,14 @@ def _check_c1(graph: np.ndarray) -> bool:
     n = graph.shape[0]
     for s in range(n):
         for s_prime in range(n):
-            if graph[s, s_prime] not in _PREORDER_CELLS:
+            if graph[s, s_prime] not in PREORDER_CELLS:
                 continue
             for t in range(n):
-                if graph[s, t] not in _TRANSITION_CELLS:
+                if graph[s, t] not in TRANSITION_CELLS:
                     continue
                 if not any(
-                    graph[s_prime, t_prime] in _TRANSITION_CELLS
-                    and graph[t, t_prime] in _PREORDER_CELLS
+                    graph[s_prime, t_prime] in TRANSITION_CELLS
+                    and graph[t, t_prime] in PREORDER_CELLS
                     for t_prime in range(n)
                 ):
                     return False
@@ -36,14 +38,14 @@ def _check_c2(graph: np.ndarray) -> bool:
     n = graph.shape[0]
     for s in range(n):
         for s_prime in range(n):
-            if graph[s, s_prime] not in _PREORDER_CELLS:
+            if graph[s, s_prime] not in PREORDER_CELLS:
                 continue
             for t_prime in range(n):
-                if graph[s_prime, t_prime] not in _TRANSITION_CELLS:
+                if graph[s_prime, t_prime] not in TRANSITION_CELLS:
                     continue
                 if not any(
-                    graph[s, t] in _TRANSITION_CELLS
-                    and graph[t, t_prime] in _PREORDER_CELLS
+                    graph[s, t] in TRANSITION_CELLS
+                    and graph[t, t_prime] in PREORDER_CELLS
                     for t in range(n)
                 ):
                     return False
@@ -55,8 +57,17 @@ def _check_graph_shape(graph: np.ndarray) -> None:
         raise AssertionError("The graph is not squared.")
 
 
+def _check_cells(graph: np.ndarray, states) -> None:
+    for (row, column), cell in np.ndenumerate(graph):
+        if cell not in _KNOWN_CELLS:
+            raise AssertionError(
+                f"Transition cell {cell!r} in row {states[row]}, column "
+                f"{states[column]} is not 0, R, P, P,R or *."
+            )
+
+
 def _check_serial(graph: np.ndarray) -> None:
-    if not all(any(cell in _TRANSITION_CELLS for cell in row) for row in graph):
+    if not all(any(cell in TRANSITION_CELLS for cell in row) for row in graph):
         raise AssertionError("The graph does not satisfy transition serial condition.")
 
 
@@ -88,7 +99,7 @@ def _check_inference_constraints(graph: np.ndarray) -> None:
 
 
 def _preorder_successors(graph: np.ndarray, states) -> dict:
-    pairs = labeled_pairs(graph, states, lambda cell: cell in _PREORDER_CELLS)
+    pairs = labeled_pairs(graph, states, PREORDER_CELLS.__contains__)
     successors = {}
     for source, dest in pairs:
         if source != dest:
@@ -122,10 +133,11 @@ def check_conditions_hold(model: Any) -> None:
     """Reject a model that is not an ICTL birelational frame: serial transitions, a
     partial knowledge order, confluence C1/C2 and monotone labelling."""
     graph = model.graph
-    preorder = np.vectorize(lambda cell: cell in _PREORDER_CELLS, otypes=[bool])(graph)
+    preorder = np.vectorize(PREORDER_CELLS.__contains__, otypes=[bool])(graph)
 
     _check_model_metadata(model)
     _check_graph_shape(graph)
+    _check_cells(graph, model.states)
     _check_serial(graph)
     _check_reflexive(preorder)
     _check_antisymmetric(preorder)

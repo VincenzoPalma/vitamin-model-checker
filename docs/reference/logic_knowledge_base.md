@@ -51,6 +51,12 @@ ordered by precedence:
 | Disjunction | `\|\|` | Logical OR |
 | Implication | `->` | Logical implication (p -> q) |
 
+`->` groups to the right: `p -> q -> r` is `p -> (q -> r)`, as in NuSMV (2.6
+manual, section 2.2.3, p. 13) and Spot (Spot-tl, section 3.1, p. 15). Tools
+disagree here: Spot-tl p. 15 notes that some tools treat `->` and `<->` as
+left-associative. `&&` and `||` group to the left. `test_precedence.py` checks
+these readings in every logic with connectives.
+
 The word forms `not`, `and`, `or` and `implies`, and the logics that read them, are
 in [word operators](#word-operators).
 
@@ -122,8 +128,8 @@ formulas; its rules and messages are in [ATL*](#atl-star).
 LTL has no prefix: its `F`, `G`, `X` and `U` follow the precedence table of the
 [Spot LTL library](https://spot.lre.epita.fr/tl.pdf), so
 `F p && q` is `(F p) && q`, `p U q && r` is `(p U q) && r` and `F p U q` is
-`(F p) U q`. One rule differs: Spot ranks `!` above `U` (Spot-tl, Sec. 3.1, p. 15), while
-VITAMIN reads `!p U q` as `!(p U q)`. Write `(!p) U q` for Spot's reading.
+`(F p) U q`. `!` binds tighter than `U` (Spot-tl, Sec. 3.1, p. 15), so `!p U q` is
+`(!p) U q`, as in the logics with a prefix; write `!(p U q)` to negate the Until.
 NatSL has no connectives after its prefix, so it rejects `E{1}x: (x, 1) F p && q`
 without offering two readings; see [NatSL](#natsl---natural-strategy-logic).
 
@@ -221,6 +227,25 @@ Table 3 lists the written forms of an Until under a coalition:
 Each operand of that `U` is one unary formula, so `<<1>> X p U q` is
 `<<1>> ((X p) U q)` and `X <<1>> p U q` is `X (<<1>> (p U q))`.
 
+No paper states how `<<A>> x U y` groups in ATL*. The ATL paper writes its Until
+with the coalition in front, `<<A>> x U y` (JACM 2002, p. 685), and defines ATL*
+as letting a coalition cover any path formula (p. 689); neither page reads the
+form without parentheses. The other tools write the parentheses: MCMAS
+`<g> (p U q)` (manual 1.2.2, section 3.2.4, pp. 23-24), PRISM-games
+`<<C>> P..[ "a" U "b" ]`, and NuSMV, which has no coalitions, `E [ p U q ]`
+(manual section 2.4.1, p. 37).
+
+The reading in Table 3 is inferred from Jamroga's ATL chapter (Jamroga 2015,
+*Logical Methods for Specification and Verification of Multi-Agent Systems*).
+Its grammar on p. 62 has `<<A>> x U y` as one operator, and the book states no
+precedence rule. Its fixpoint law (FPU) (pp. 63, 65) says that `<<A>> x U y` holds
+when `y` holds now, or `x` holds now and the coalition can force a next state
+where `<<A>> x U y` holds: `<<A>> x U y <-> y || (x && <<A>> X <<A>> x U y)`.
+Under the reading `(<<A>> x) U y` the right side would not be a state formula, so
+the law makes sense only if `<<A>>` covers the Until. The test
+`test_until_fixpoint_written_without_parentheses` checks both sides of (FPU), as
+written, on one model.
+
 `!`, `X`, `F` and `G` bind tighter than the connectives: `<<1>> (F p && G q)` is
 `<<1>> ((F p) && (G q))`. These are syntax errors that ask for parentheses:
 
@@ -244,7 +269,9 @@ declared propositions ['p', 'q']". How the checker works:
 ### Theoretical background
 
 NatSL quantifies over bounded natural strategies and binds those strategies to
-agents. The checker implements a restricted one-goal fragment.
+agents. The checker implements a restricted one-goal fragment, the one SPIRIT
+2024 describes for its tool (p. 5); see
+[fragment covered](../algorithms/natsl.md#fragment-covered).
 
 #### Standard syntax
 
@@ -387,6 +414,7 @@ How the checker computes each operator: [OL algorithm](../algorithms/ol.md).
 ### Theoretical background
 
 RBATL and RABATL extend ATL with vector cost bounds on coalition strategies over `costCGS` models.
+The bound limits the summed cost of the coalition's moves along a path, per resource (PRIMA 2024, Def. 4); see [RBATL operators](../algorithms/rbatl.md#operators).
 
 The standard syntax is the vector bounded coalition `<A><b1, b2, ...> phi`:
 
@@ -407,10 +435,10 @@ RBATL and RABATL accept the same formulas.
 #### Validation rules
 
 - Comma separation: resource vectors use commas, not colons.
-- Bound range: each bound value is between 0 and 1,000,000. `<1><1000001>F p` is an error, "Invalid bound value 1000001: must be between 0 and 1000000".
+- Bound range: each bound value is between 0 and 1,000,000. `<1><1000001>F p` is an error, "Invalid bound value 1000001: must be between 0 and 1000000". `F`, `G` and `U` also need the product of `b_i + 1` to be at most 100000 (see [RBATL operators](../algorithms/rbatl.md#operators)).
 - Bound 0: a bound of 0 for a resource allows only moves of cost 0 in that resource. The PRIMA 2024 algorithm has its own cases for bound 0 (p. 12, lines 13 and 26).
 - Leading zeros: a bound value with a leading zero (`<1><05>F p`, `<1><2,05>F p`) is an error, as in OATL: "Bound cannot have leading zeros (e.g., use <1><5>, not <1><05>)".
-- Resource count: the length of the bound vector is not checked against the model. Bound `i` limits cost value `i`; cost values beyond the last bound are not limited, and bounds beyond the last cost value are ignored.
+- Resource count: bound `i` limits cost value `i`, and cost values beyond the last bound are not limited. Accepting a bound with fewer values than the model has resources is a VITAMIN convention; PRIMA 2024 takes one value per resource (see [RBATL differences from the papers](../algorithms/rbatl.md#differences-from-the-papers)). A bound with more values than the model's cost vectors is a `validation` error that names it, such as `<1,2><3,1,5>F p` on a model with two resources.
 
 #### Formula examples
 
@@ -429,7 +457,7 @@ How the checkers compute each operator and the cost of a joint action:
 
 ### Theoretical background
 
-CapATL is ATL on [`capCGS`](file_formats.md#capcgs-sections) models, in which each agent acts within one capacity (a named set of actions), chosen from those the model assigns it; it adds a knowledge operator over the capacity assignment. How the checker picks the capacities: [CapATL algorithm](../algorithms/capatl.md).
+CapATL is ATL on [`capCGS`](file_formats.md#capcgs-sections) models, in which each agent acts within one capacity (a named set of actions), chosen from those the model assigns it: the coalition of `<{A}>` picks its members' capacities, and the opponents may hold any of theirs. It adds a knowledge operator over the capacity assignment. How the checker picks the capacities: [CapATL algorithm](../algorithms/capatl.md).
 
 #### Standard syntax
 
@@ -451,7 +479,8 @@ CapATL is ATL on [`capCGS`](file_formats.md#capcgs-sections) models, in which ea
   `true`, `false` and parentheses, with the precedence of the other connectives.
   `K2(!(3 is c) && 1 is cop)` says that agent 2 knows that agent 3 does not have
   capacity `c` and agent 1 has `cop`. `Ka(...)` may stand alone or inside any
-  formula (`<{1}> F (g && K1(1 is c))`); `a is c` is valid only inside it.
+  formula (`<{1}> F (g && K1(1 is c))`); `a is c` is valid only inside it. How
+  the checker evaluates it: [knowledge operator](../algorithms/capatl.md#knowledge-operator).
 - Knowledge errors: `K1 1 is c` (no parentheses), `K1(K2(1 is c))` (nested `K`),
   `K1(p)` (an atom inside `K`) and an agent out of range are errors whose message
   names the part. `K1x` and `K12x` are each one word, refused as names because they
@@ -465,9 +494,8 @@ CapATL is ATL on [`capCGS`](file_formats.md#capcgs-sections) models, in which ea
 - Formula bound: `<{A}, k>` is rejected (no numeric `k` in CapATL).
 - Weak Until: `W` is not part of CapATL path syntax and is unsupported.
 - Release: `R` is accepted as a binary operator (`<{A}> phi R psi`).
-- Knowledge: `K1(...)` parses, but model checking a formula that contains it
-  returns an error of type `validation` that names the operator: "The knowledge
-  operator K1(...) is parsed but not evaluated by the CapATL solver yet".
+- Knowledge: `a is c` with a capacity that the model's `Capacities` section does
+  not declare is an error of type `semantic` that names it.
 
 #### Formula examples
 
@@ -551,7 +579,12 @@ A guard is written `wallet(agent, op value)`, with `op` one of `>=`, `<=`, `==`,
 agent with no guard is unconstrained, and one agent may have several guards
 (`wallet(1, >= 3) && wallet(1, <= 5)`). Each guard names a coalition agent:
 `<<1:wallet(2, >= 5)>>` is a syntax error that names agent 2. `<<>>` with no agent
-is an error.
+is an error. The AAMAS 2026 grammar allows a guard on any agent (p. 4), but its
+semantics checks the guard only for each agent `a` in the coalition `A`, in the
+initial state of a computation (Def. 4.5, p. 4), so a guard on another agent
+could never change a result. The original Wallet_ATL code (original VITAMIN
+repository, branch `Wallet_ATL`, commit 32e7b562) ignored such a guard without a
+message, and of two guards on one agent it checked only the last one written.
 
 Wallet_ATL writes `<<...>>` instead of ATL's `<1>` because its guards sit inside
 the prefix, after the agents. ATL* also writes `<<...>>`, with a different meaning
@@ -691,7 +724,10 @@ The quantifiers are `A` and `E`, with `F`, `G`, `U` (no `X` or release).
 Clocks and clock guards:
 
 - Automaton clocks `X` from the model `Clocks` section.
-- Formula clocks `J` via freeze `j.phi` (reset `j` to `0`).
+- Formula clocks `J` via freeze `j.phi` (reset `j` to `0`). A freeze on a clock
+  declared in the model `Clocks` section, such as `x.EF (x>=2)` when the model
+  declares `x`, is a `semantic` error that names the clock (AAMAS 2025 Def. 10,
+  p. 4, requires `X` and `J` to be disjoint).
 - Guards: standalone `x <= 5` or attachment `phi : x <= c` on subformulas.
 
 For example:
@@ -703,7 +739,7 @@ EF (p : x<=1)
 j.A(j<=7 U goal)
 ```
 
-The model type is `timedCGS`. The zone graph and the fixpoints over regions:
+The model type is `timedCGS`. The region graph and the fixpoints over regions:
 [TCTL algorithm](../algorithms/tctl.md).
 
 <a id="tol---timed-obstruction-logic"></a>
@@ -728,14 +764,21 @@ For example:
 j.{J5}(j<=7 U goal)
 ```
 
-The temporal operators are `F`, `G`, `U`, `R`, `W` (paper) and `X` (VITAMIN extension).
+The temporal operators are `F`, `G`, `U`, `R`, `W`. The parser rejects `X` and
+`next`, as it does in TCTL. The paper leaves the next operator out because time is
+continuous: "Unlike OL, our logical TOL does not use the next operator. This is
+because the time domain is continuous and there is no unique next time" (AAMAS 2025,
+p. 4).
 
 The budget `k` is spent anew at each step: the Demon may deactivate
 transitions whose costs add up to at most `k`, and the budget does not carry over
 along the path. OL (`<Jk>`) reads its budget the
 same way.
 
-The freeze `j.phi` resets formula clock `j` to `0` at the current state.
+The freeze `j.phi` resets formula clock `j` to `0` at the current state and
+evaluates `phi` from there (AAMAS 2025 Def. 11, p. 4); see
+[TCTL freezes](../algorithms/tctl.md#overview). A freeze on a clock declared in
+the model `Clocks` section is a `semantic` error, as in TCTL.
 
 The model type is `timedCGS`, the same as TCTL. How the checker computes each
 operator: [TOL algorithm](../algorithms/tol.md).
@@ -818,7 +861,7 @@ may start with a capital.
 - Formulas: `validate_proposition_identifier()` in
   `model_checker/parsers/formulas/parser_utils.py` checks, in every logic, the
   propositions of a formula, the capacity names of a CapATL formula and the clock
-  names of a TCTL or TOL formula (in a freeze `x.phi` and a comparison `x<=2`).
+  names of a TCTL or TOL formula (in a freeze `j.phi` and a comparison `x<=2`).
 - Models: `validate_model_name()` in
   `model_checker/parsers/game_structures/cgs/cgs_utils.py` applies the same check
   to the propositions of a CGS model, the `Clocks` section of a timedCGS model and
@@ -876,7 +919,7 @@ the table, because the word carries the agent number; see `kcap` under
 | `and` | `&&` | every logic except NatSL |
 | `or` | `\|\|` | every logic except NatSL |
 | `implies` | `->` | every logic except NatSL |
-| `next` | `X` | every logic except NatSL, TCTL |
+| `next` | `X` | every logic except NatSL, TCTL, TOL |
 | `eventually` | `F` | every logic except NatSL |
 | `globally` | `G` | every logic except NatSL |
 | `always` | `G` | every logic except NatSL |
@@ -940,7 +983,7 @@ only on a 1-agent model (see [NatSL](#natsl---natural-strategy-logic)).
 | LTL | none | `X`, `F`, `G`, `U` | CGS | `G (p -> F q)` |
 | CTL | `A`, `E` | `AX`, `AF`, `AG`, `EX`, `EF`, `EG`, `A[p U q]`, `E[p U q]` | CGS | `AG (p -> EF q)` |
 | ICTL | `A`, `E` | as CTL, plus `R` in `A[p R q]`, `E[p R q]` | BirelationalMatrix | `E[p R q]` |
-| TCTL | `A`, `E`; clock constraint `phi : x<5`; freeze `x.phi` | `AF`, `AG`, `EF`, `EG`, `A(p U q)`, `E(p U q)` (no brackets) | timedCGS | `AF p : x<5` |
+| TCTL | `A`, `E`; clock constraint `phi : x<5`; freeze `j.phi` | `AF`, `AG`, `EF`, `EG`, `A(p U q)`, `E(p U q)` (no brackets) | timedCGS | `AF p : x<5` |
 | ATL | `<1,2>` | `X`, `F`, `G`, `U` | CGS | `<1,2>F p` |
 | ATLF | `<1,2>` | `X`, `F`, `G`, `U` | fuzzyCGS | `<1>(p U q)` |
 | IATL | `<1,2>` exists, `[1,2]` for all | `X`, `F`, `G`, `U`, `R` | BCGS | `[1,2]F goal` |
@@ -956,7 +999,7 @@ only on a 1-agent model (see [NatSL](#natsl---natural-strategy-logic)).
 | NatATLF | `<{1,2}, 5>` | `X`, `F`, `G`, `U` | CGS | `<{1,2}, 5>F p` |
 | CapATL | `<{1,2}>`; knowledge `K1(...)` | `X`, `F`, `G`, `U`, `R` | capCGS | `<{1}>F (g && K1(1 is c))` |
 | OL | `<J5>` | `X`, `F`, `G`, `U`, `R`, `W` | costCGS | `<J5> (p R q)` |
-| TOL | `{J5}`; clock constraint `phi : x<5`; freeze `x.phi` | `X`, `F`, `G`, `U`, `R`, `W` | timedCGS | `{J5}F x.(p : x<5)` |
+| TOL | `{J5}`; clock constraint `phi : x<5`; freeze `j.phi` | `F`, `G`, `U`, `R`, `W` | timedCGS | `{J5}F j.(p : j<5)` |
 | NatSL | `E{1}x A{1}y: (x, 1)(y, 2)` | one goal: `F`, `G` or `X` | CGS | `E{1}x: (x, 1) F goal` |
 | SL1G_F | `E x A y: (x, 1)(y, 2)`, binding every agent; `<<1,2>>` | as ATL_STAR_F | fuzzyCGS | `E x A y: (x, 1)(y, 2) F p` |
 
@@ -977,12 +1020,12 @@ holds at a state:
 | Logic | Path type | Algorithm pattern | Notes |
 | :--- | :--- | :--- | :--- |
 | CTL | Branching | Pre-image and fixpoints | Path quantifiers `A`, `E` |
-| LTL | Linear | Strategy search and pruning | No prefix; true when all agents together have natural strategies of size at most 5 under which the formula, rewritten for CTL with `A` before each temporal operator, holds at the initial state ([LTL](../algorithms/ltl.md)) |
+| LTL | Linear | Strategy search and pruning | No prefix; true when the coalition (all agents by default) has natural strategies of size at most `k` (5 by default) under which the formula, rewritten for CTL with `A` before each temporal operator, holds at the initial state ([LTL](../algorithms/ltl.md)) |
 | ATL | Branching | Coalition pre-image and fixpoints | Coalition `<A>` with no bound |
 | ATLF | Branching | Coalition pre-image and fixpoints | Per-state values, not a set of states ([ATLF](../algorithms/atlf.md)) |
 | ATL* | Branching | LTL to deterministic parity automaton, product with the model, two-player game | Nested path formulas and coalitions inside `<<A>>`; no wallet guards |
-| NatATL | Branching | Strategy search and pruning | Memoryless strategies; `k` is the strategy complexity |
-| NatATL_Recall | Branching | Strategy search and pruning | As NatATL, with recall strategies |
+| NatATL | Branching | Strategy search and pruning | Memoryless natural strategies; `k` bounds the coalition's total strategy size, `true` rules included |
+| NatATL_Recall | Branching | Strategy search and product model | Rules whose conditions are patterns over the history (see [Recall](../algorithms/natatl.md#recall)) |
 | NatATLF | Branching | Strategy search and pruning | Delegates to the memoryless NatATL solver |
 | NatSL | Branching | Strategy search and pruning | Schedule `space` (default) or `time` |
 | OATL | Branching | Budget-aware coalition pre-image and fixpoints | Demon budget per step |
@@ -994,8 +1037,8 @@ holds at a state:
 | Wallet_ATL | Branching | Coalition pre-image over payable moves, filtered by the wallet guards, and fixpoints | Wallet guards in the coalition |
 | ICTL | Branching | Upward closure and pre-image fixpoints | Intuitionistic `->` and `not` |
 | IATL | Branching | Upward closure and coalition pre-image fixpoints | Intuitionistic `->` and `!`; `[A]` is the universal coalition |
-| TCTL | Branching | Zone graph and fixpoints over regions | Clock constraints and freeze |
-| TOL | Branching | Zone graph and obstruction fixpoints | Per-step obstruction, clock constraints and freeze |
+| TCTL | Branching | Region graph and fixpoints over regions | Clock constraints and freeze |
+| TOL | Branching | Region graph and obstruction fixpoints | Per-step obstruction, clock constraints and freeze |
 
 <a id="model-syntax"></a>
 ## Model syntax

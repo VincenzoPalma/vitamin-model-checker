@@ -6,6 +6,10 @@ from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 
+# Only `and`. The original code also joined with `or`, but then `G goal` with
+# k = 5 on ltl_1agent_3states_minimal (false) takes 13 s instead of 0.1 s.
+CONDITION_CONNECTIVES = ["and"]
+
 
 def _search_strategy_profiles(
     strategies: list[list[dict]],
@@ -43,19 +47,27 @@ def generate_conditions(
                         yield from generate_condition(k - 1, new_condition)
                     elif len(new_condition) > 1:
                         new_condition.sort()
-                        connective = connectives[0] if connectives else "and"
-                        new_condition_str = new_condition[0] + " " + connective + " "
-                        for i in range(1, len(new_condition) - 1):
-                            new_condition_str += (
-                                new_condition[i] + " " + connective + " "
-                            )
-                        new_condition_str += new_condition[-1]
-                        complexity = len(new_condition_str.split())
-                        if complexity <= max_complexity:
-                            yield from generate_condition(k - 1, [new_condition_str])
+                        joins = itertools.product(
+                            connectives, repeat=len(new_condition) - 1
+                        )
+                        for ops in joins:
+                            new_condition_str = new_condition[0]
+                            for op, prop in zip(ops, new_condition[1:], strict=True):
+                                new_condition_str += f" {op} {prop}"
+                            complexity = len(new_condition_str.split())
+                            if complexity <= max_complexity:
+                                yield from generate_condition(
+                                    k - 1, [new_condition_str]
+                                )
 
     for k in range(1, max_complexity + 1):
         yield from generate_condition(k, [])
+
+
+def condition_size(condition: str) -> int:
+    """Number of symbols of a condition: each word and each `!` counts one, so `p`
+    is 1, `!p` is 2 and `!p and !q` is 5."""
+    return len(condition.split()) + condition.count("!")
 
 
 def generate_negated_conditions(
@@ -63,16 +75,15 @@ def generate_negated_conditions(
 ) -> Generator[str, None, None]:
     """Yield each condition with every choice of negated atoms, within max_complexity."""
     for condition in conditions:
-        atomic_props = condition.split(" && ")
-        for combo in itertools.product(["", "!"], repeat=len(atomic_props)):
-            negated_props = [
-                f"{combo[i]}{atomic_props[i]}" for i in range(len(atomic_props))
-            ]
-            new_str = " && ".join(negated_props)
-            complexity = len(new_str.split())
-            if "!" in new_str:
-                complexity += 1
-            if complexity <= max_complexity:
+        # Atoms and connectives alternate: "p and q or r".
+        words = condition.split()
+        atoms, joins = words[::2], words[1::2]
+        for combo in itertools.product(["", "!"], repeat=len(atoms)):
+            negated = [f"{sign}{atom}" for sign, atom in zip(combo, atoms, strict=True)]
+            new_str = negated[0] + "".join(
+                f" {op} {atom}" for op, atom in zip(joins, negated[1:], strict=True)
+            )
+            if condition_size(new_str) <= max_complexity:
                 yield new_str
 
 
@@ -98,12 +109,9 @@ def generate_strategies(
                     if len(distinct_actions) != len(combination):
                         continue
 
-                    total_complexity = 0
-                    for condition, _ in combination:
-                        condition_complexity = len(condition.split())
-                        if "!" in condition:
-                            condition_complexity += 1
-                        total_complexity += condition_complexity
+                    total_complexity = sum(
+                        condition_size(condition) for condition, _ in combination
+                    )
                     if total_complexity != complexity_bound:
                         continue
 
@@ -150,12 +158,13 @@ def generate_guarded_action_pairs(
 
     Returns an empty dict on error.
     """
-    connectives = ["and", "or"]
     try:
         cartesian_products: dict[str, list[tuple[str, str]]] = {}
         for _agent_key in agent_actions.keys():
             conditions = list(
-                generate_conditions(atomic_propositions, connectives, complexity_bound)
+                generate_conditions(
+                    atomic_propositions, CONDITION_CONNECTIVES, complexity_bound
+                )
             )
             for condition in conditions:
                 negated_conditions = list(
