@@ -1194,7 +1194,7 @@ dependencies = [
     { name = "numpy" },
     { name = "ply" },
     { name = "pydantic" },
-    { name = "spottl", marker = "sys_platform == 'linux'" },
+    { name = "spottl", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
 ]
 
 [package.optional-dependencies]
@@ -1230,7 +1230,7 @@ requires-dist = [
     { name = "pytest-timeout", marker = "extra == 'dev'", specifier = ">=2.0.0" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.6.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6.0" },
-    { name = "spottl", marker = "sys_platform == 'linux'", specifier = ">=2.13" },
+    { name = "spottl", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'", specifier = ">=2.13" },
 ]
 provides-extras = ["dev", "docs"]
 

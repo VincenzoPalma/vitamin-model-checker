@@ -41,7 +41,7 @@ dependencies = [
     "ply==3.11",
     "numpy>=1.26.0,<1.27.0",
     "pydantic>=2.7.0",
-    "spottl>=2.13; sys_platform == 'linux'",
+    "spottl>=2.13; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
 [project.urls]
