@@ -51,6 +51,7 @@ When `phi` is 1 in every state, `<A> G phi` returns 1 everywhere without applyin
 `res` is `Result: ` followed by the list of `(state, value)` pairs in the model's
 state order, such as `Result: [('s0', 0.2), ('s1', 0.3)]`. `initial_state` gives
 the value at the initial state, such as `Initial state s0: 0.2`, not true or false.
+`state_values` maps each state to its value, such as `{"s0": 0.2, "s1": 0.3}`.
 Every value is a float. The result of `1 - x` (in `!phi` and `phi -> psi`) is
 rounded to 12 decimals, so `!p` with `p = 0.7` gives `0.3` where plain float
 subtraction would leave `0.30000000000000004`; labels are kept as written.

@@ -58,7 +58,7 @@ line, spaces around it ignored:
 | [`BCGS`](#bcgs-sections-iatl) | IATL | CGS transitions plus a boolean `Preorder` section. | A `Preorder` header |
 | [`BirelationalMatrix`](#birelationalmatrix-sections-ictl) | ICTL | Same sections as CGS; `Transition` cells are `0`/`R`/`P`/`P,R`. | Every `Transition` cell is one of those four and at least one is `P` or `P,R` |
 | [`CGS`](#cgs-sections) | ATL, ATL*, CTL, LTL, NatATL (and NatATL_Recall), NatATLF, NatSL | Standard concurrent game structure. | No row above matches |
-| [`fuzzyCGS`](#fuzzycgs-sections) | ATLF | `Labelling` cells between 0 and 1. | Never by headers, which are those of CGS; ATLF's `model_type` selects it |
+| [`fuzzyCGS`](#fuzzycgs-sections) | ATLF, ATL_STAR_F, SL1G_F | `Labelling` cells between 0 and 1. | Never by headers, which are those of CGS; the logic's `model_type` selects it |
 
 When checking a formula, the logic's `model_type` metadata also sets the type, so
 ICTL always loads a `BirelationalMatrix` and ATLF a `fuzzyCGS`.

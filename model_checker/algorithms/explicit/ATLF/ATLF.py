@@ -46,10 +46,11 @@ def _core_atlf_checking(cgs, formula):
         )
     solve_tree(cgs, root)
     initial_state = cgs.initial_state
-    value_initial_state = dict(parse_tuple_list_literal(root.value))[initial_state]
+    state_values = dict(parse_tuple_list_literal(root.value))
     return {
         "res": f"Result: {root.value}",
-        "initial_state": f"Initial state {initial_state}: {value_initial_state}",
+        "initial_state": f"Initial state {initial_state}: {state_values[initial_state]}",
+        "state_values": state_values,
     }
 
 

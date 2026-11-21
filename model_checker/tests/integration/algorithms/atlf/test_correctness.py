@@ -36,6 +36,7 @@ def test_value_per_state_matches_the_hand_computed_one(
     assert "error" not in result, result
     values = dict(parse_tuple_list_literal(result["res"].removeprefix("Result: ")))
     assert values == expected
+    assert result["state_values"] == expected
     assert result["initial_state"] == f"Initial state s0: {expected['s0']}"
 
 

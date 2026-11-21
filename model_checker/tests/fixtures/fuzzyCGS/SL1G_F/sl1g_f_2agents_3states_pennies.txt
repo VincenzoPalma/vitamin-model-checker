@@ -1,0 +1,26 @@
+# MODEL: Two-agent fuzzyCGS with 3 states (s0-s2), matching pennies
+
+# PURPOSE: SL1G_F quantifier alternation and quantitative strategy synthesis.
+
+# LOGIC: SL1G_F
+
+# DESCRIPTION: In s0 both agents play H or T: equal actions go to s1, different
+# ones to s2; s1 and s2 loop. p is 0 in s0, 0.8 in s1 and 0.3 in s2; q is 0,
+# 0.2 and 0.9.
+
+Transition
+0 HH,TT HT,TH
+0 * 0
+0 0 *
+Name_State
+s0 s1 s2
+Initial_State
+s0
+Atomic_propositions
+p q
+Labelling
+0 0
+0.8 0.2
+0.3 0.9
+Number_of_agents
+2

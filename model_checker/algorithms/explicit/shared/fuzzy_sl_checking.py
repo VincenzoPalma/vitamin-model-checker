@@ -4,12 +4,15 @@
   candidate value, see `model_checker/fuzzy_sl/verifier.py`).
 - The checking result is ATLF's: `res` lists `(state, value)` in the model's state
   order and `initial_state` gives the initial state's value, both as floats.
-  `exact_values` maps each state to its exact value, such as `"1/5"`.
+  `state_values` maps each state to its value as a float, `exact_values` to its
+  exact value, such as `"1/5"`.
 - Synthesis returns the strategy achieving the formula's value at a state, as
-  `fuzzy_sl.export_strategy` builds it (see `model_checker/fuzzy_sl/strategy_export.py`).
+  `fuzzy_sl.export_strategy` builds it (see `model_checker/fuzzy_sl/strategy_export.py`),
+  with `state_values` and `exact_values` as above and `satisfied` None: a value in
+  [0, 1] is not true or false.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from fractions import Fraction
 from typing import Any
 
@@ -85,15 +88,27 @@ def core_checking(logic_type: str) -> Callable[[CGSProtocol, str], dict[str, Any
         except ValueError as e:
             return create_error_response("semantic", str(e))
 
-        states = [str(cgs.get_state_name_by_index(i)) for i in range(len(cgs.states))]
         initial_state = str(cgs.initial_state)
         return {
-            "res": f"Result: {[(state, float(values[state])) for state in states]}",
+            "res": f"Result: {[(state, float(values[state])) for state in _states(cgs)]}",
             "initial_state": f"Initial state {initial_state}: {float(values[initial_state])}",
-            "exact_values": {state: str(values[state]) for state in states},
+            **_value_fields(cgs, values),
         }
 
     return _core
+
+
+def _states(cgs: CGSProtocol) -> list[str]:
+    return [str(cgs.get_state_name_by_index(i)) for i in range(len(cgs.states))]
+
+
+def _value_fields(cgs: CGSProtocol, values: Mapping[Any, Fraction]) -> dict[str, Any]:
+    """`state_values` (floats) and `exact_values` (fractions as strings), in state order."""
+    states = _states(cgs)
+    return {
+        "state_values": {state: float(values[state]) for state in states},
+        "exact_values": {state: str(values[state]) for state in states},
+    }
 
 
 def synthesize_strategy(
@@ -117,10 +132,12 @@ def synthesize_strategy(
         at = str(cgs.initial_state) if state is None else state
         if at not in model.states:
             return create_error_response(
-                "semantic", f"Unknown state {at!r}; states: {sorted(map(str, model.states))}"
+                "semantic",
+                f"Unknown state {at!r}; states: {sorted(map(str, model.states))}",
             )
 
         try:
+            values = sat(parsed, model, standard_registry())
             strategy = export_strategy(
                 witness(parsed, model, standard_registry(), state=at)
             )
@@ -133,7 +150,9 @@ def synthesize_strategy(
         return {
             "res": f"Result: strategy synthesized, value {value}",
             "initial_state": f"State {at}: {float(Fraction(value))}",
+            "satisfied": None,
             "strategy": strategy,
+            **_value_fields(cgs, values),
         }
 
     return execute_model_checking_with_parser(
